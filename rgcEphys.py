@@ -59,11 +59,23 @@ class Cell(dj.Manual):
 class Morphology(dj.Manual):
 	definition = """
 	-> Experiment
-
 	---
-	# PUT MORE INFO HERE
 	"""
 
+@schema
+class Stimulus(dj.Lookup):
+    definition = """
+    # stimuli used in experiments
+    stim_type      : varchar(50) # stimulus type
+    ---
+
+    """
+
+    contents = [("bw_noise",),
+                ("chirp",),
+                ("ds",),
+                ("on_off"),
+                ]
 	
 @schema
 class Recording(dj.Manual):
@@ -71,32 +83,35 @@ class Recording(dj.Manual):
 	# Stimulus information for a particular recording
 	
 	->Cell
-	
-    filename		:varchar(200) 							# name of the converted recording file
+	->Stimulus
+	repeat_idx       : int auto_increment     # repeat number of that stimulus for that cell
+
     ---
-    stim_type		:enum("bw_noise","chirp","ds","on_off")	# type of stimulus played during the recording
+    filename		 : varchar(200) 		  # name of the converted recording file
 	"""
 
-@schema
-class Rawdata(dj.Imported):
-	definition="""
-	# Rawdata extracted from h5 file
-	
-	->Recording
-	---
-	rawtrace		:longblob	# array containing the raw voltage trace
-	triggertrace	:longblob	# array containing the light trigger trace
-	"""
-	
-	def _make_tuples(self,key):
-		# fetch required data
-		fname = (Recording() & key).fetch1['filename']
-		cell_path = (Cell() & key).fetch1['folder']
-		exp_path = (Experiment() & key).fetch1['path']
-		
-		# extract raw data for the given recording
-		full_path = exp_path + '/' + cell_path + '/' + fname + '.h5'
 
-        with h5py.File(full_path,'r') as f:
-    		ch_keylist = [key for key in f['channels'].keys()]
-		
+# possibly remove that relation and only pull the raw data when computing something from it
+# @schema
+# class Trace(dj.Imported):
+# 	definition="""
+# 	# Rawdata extracted from h5 file
+#
+# 	->Recording
+# 	---
+# 	rawtrace		:longblob	# array containing the raw voltage trace
+# 	triggertrace	:longblob	# array containing the light trigger trace
+# 	"""
+#
+# 	def _make_tuples(self,key):
+# 		# fetch required data
+# 		fname = (Recording() & key).fetch1['filename']
+# 		cell_path = (Cell() & key).fetch1['folder']
+# 		exp_path = (Experiment() & key).fetch1['path']
+#
+# 		# extract raw data for the given recording
+# 		full_path = exp_path + '/' + cell_path + '/' + fname + '.h5'
+#
+#         with h5py.File(full_path,'r') as f:
+#     		ch_keylist = [key for key in f['channels'].keys()]
+#
