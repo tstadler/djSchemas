@@ -31,7 +31,7 @@ class Experiment(dj.Manual):
     exp_date	:date										# date of recording
     eye			:enum("R","L","unknown")					# left or right eye of the animal
     ---
-    experimenter="tstadler"		:varchar(20)				            # first letter of first name + last name = lrogerson/tstadler
+    experimenter="tstadler"		:varchar(20)				            # first letter of first name + last name = mroman/lrogerson/tstadler
     setup="2"					:tinyint unsigned			            # setup 1-3
     amplifier="abraham"			:enum("abraham","nikodemus","ehrlich")  # amplifiers abraham and nikodemus for setup 1
     preparation="wholemount"	:enum("wholemount","slice")	            # preparation type of the retina
@@ -361,3 +361,330 @@ class Spikes(dj.Computed):
             ax.set_xlabel('Time [s]', labelpad=20)
             ax.set_xlim([start, end])
             plt.locator_params(axis='y', nbins=5)
+
+
+@schema
+class Trigger(dj.Computed):
+    definition="""
+    ->Recording
+    ---
+    triggertimes	:longblob	# trigger times in sample points
+    """
+
+    def _make_tuples(self,key):
+        # fetch required data
+
+        fname = (Recording() & key).fetch1['filename']
+        ch_trigger = (Recording() & key).fetch1['ch_trigger']
+
+        cell_path = (Cell() & key).fetch1['folder']
+        exp_path = (Experiment() & key).fetch1['path']
+
+        # read rawdata from file
+
+        full_path = exp_path + cell_path + fname + '.h5'
+        f = h5py.File(full_path,'r')
+
+        ch_grp = f[ch_trigger]
+        keylist = [key for key in ch_grp.keys()]
+        trigger_trace  = ch_grp[keylist[1]]['data'][:]
+        for sec in range(2,len(keylist)):
+            ch_sec_tmp = ch_grp[keylist[sec]]
+            dset = ch_sec_tmp['data'][:]
+            trigger_trace = np.append(trigger_trace,dset)
+
+        # get trigger times by diff
+
+        tmp = np.array(trigger_trace)
+        thr_boolean = [tmp < 1]
+        tmp[thr_boolean] = 0
+        tmp[tmp!=0]=1
+        tmp2 = np.append(tmp[1:len(tmp)],[0])
+        dif = tmp-tmp2
+        triggertimes = np.where(dif==-1)[0]
+
+        # insert
+        self.insert1(dict(key, triggertimes=triggertimes))
+
+@schema
+class BWNoise(dj.Computed):
+    definition="""
+    # Fetch parameter set and stimulus array from filename
+
+    -> Recording
+
+    ---
+    freq	:int										# stimulation frequency in Hertz
+    delx	:int										# size of a pixel in x dimensions
+    dely	:int										# size of a pixel in y dimensions
+    mseq	:varchar(500)								# name of txt file containing mseq
+    """
+    @property
+    def populated_from(self):
+        return Recording() & dict(stim_type='bw_noise')
+
+    def _make_tuples(self, key):
+
+        #fetch required data
+
+        fname = (Recording() & key).fetch1['filename']
+
+        # extract stimulus parameter for the given recording
+
+        if '5Hz' in fname:
+            if '40um' in fname:
+                if 'long' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_long'))
+                elif '2400' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_15_15_2400'))
+                else:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_official'))
+
+
+            elif ('20um' in fname) or ('BCNoise' in fname):
+                if 'long' in fname:
+                    self.insert1(dict(key,freq=5,delx=20, dely=20,mseq='BWNoise_long'))
+                elif '2400' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_15_15_2400'))
+                else:
+                    self.insert1(dict(key,freq=5,delx=20, dely=20,mseq='BWNoise_official'))
+            else:
+                if 'long' in fname:
+                    self.insert1(dict(key,freq=5,delx=40, dely=40,mseq='BWNoise_long'))
+                elif '2400' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_15_15_2400'))
+                else:
+                    self.insert1(dict(key,freq=5,delx=40, dely=40,mseq='BWNoise_official'))
+
+        elif '20Hz' in fname:
+            if '40um' in fname:
+                if 'long' in fname:
+                    self.insert1(dict(key,freq=20,delx=40,dely=40,mseq='BWNoise_long'))
+                elif '2400' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_15_15_2400'))
+                else:
+                    self.insert1(dict(key,freq=20,delx=40,dely=40,mseq='BWNoise_official'))
+
+
+            elif ('20um' in fname) or ('BCNoise' in fname):
+                if 'long' in fname:
+                    self.insert1(dict(key,freq=20,delx=20, dely=20,mseq='BWNoise_long'))
+                elif '2400' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_15_15_2400'))
+                else:
+                    self.insert1(dict(key,freq=20,delx=20, dely=20,mseq='BWNoise_official'))
+            else:
+                if 'long' in fname:
+                    self.insert1(dict(key,freq=20,delx=40, dely=40,mseq='BWNoise_long'))
+                elif '2400' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_15_15_2400'))
+                else:
+                    self.insert1(dict(key,freq=20,delx=40, dely=40,mseq='BWNoise_official'))
+
+        else:
+            if '40um' in fname:
+                if 'long' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_long'))
+                elif '2400' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_15_15_2400'))
+                else:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_official'))
+
+
+            elif ('20um' in fname) or ('BCNoise' in fname):
+                if 'long' in fname:
+                    self.insert1(dict(key,freq=5,delx=20, dely=20,mseq='BWNoise_long'))
+                elif '2400' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_15_15_2400'))
+                else:
+                    self.insert1(dict(key,freq=5,delx=20, dely=20,mseq='BWNoise_official'))
+            else:
+                if 'long' in fname:
+                    self.insert1(dict(key,freq=5,delx=40, dely=40,mseq='BWNoise_long'))
+                elif '2400' in fname:
+                    self.insert1(dict(key,freq=5,delx=40,dely=40,mseq='BWNoise_15_15_2400'))
+                else:
+                    self.insert1(dict(key,freq=5,delx=40, dely=40,mseq='BWNoise_official'))
+
+@schema
+class BWNoiseFrames(dj.Computed):
+    definition="""
+    # Stimulus frames for a given mseq
+
+    ->BWNoise
+    ---
+    frames		: longblob		# array of stimulus frames
+    stim_length	: int			# number of frames
+    stim_dim_x	: int			# number of pixel rows
+    stim_dim_y	: int			# number of pixel columns
+    """
+
+    def _make_tuples(self, key):
+
+        stim_folder = "/notebooks/Notebooks/Stadler/stimulus_ana/"
+        mseq = (BWNoise() & key).fetch1['mseq']
+        # read stimulus information into np.array
+        mseq_name = stim_folder + mseq
+        Frames = []
+        stimDim = []
+
+        lines=open(mseq_name + '.txt').read().split('\n')
+
+        params = lines[0].split(',')
+        stimDim.append(int(params[0]))
+        stimDim.append(int(params[1]))
+        stimDim.append(int(params[2]))
+
+        nB = stimDim[0]*stimDim[1]
+
+        for l in range(1,len(lines)):
+            split = lines[l].split(',')
+            Frame = np.array(split).astype(int)
+            Frames.append(Frame)
+        Frames = Frames - np.mean(Frames,0)
+
+
+        # insert data
+        self.insert1(dict(key,frames=Frames, stim_length=stimDim[2], stim_dim_x=stimDim[0], stim_dim_y=stimDim[1]))
+
+@schema
+class STA(dj.Computed):
+    definition="""
+    # Calculate the spike-triggered ensemble from noise recording
+    -> Recording
+    ---
+    sta    : longblob	# spike-triggered average
+    """
+    @property
+    def populated_from(self):
+        return Recording() & dict(stim_type='bw_noise')
+
+    def _make_tuples(self,key):
+
+        fs = (Recording() & key).fetch1['fs']
+
+        spiketimes = (Spikes() & key).fetch1['spiketimes']
+        triggertimes = (Trigger() & key).fetch1['triggertimes']
+        rec_len = (Spikes() & key).fetch1['rec_len']
+
+        frames = (BWNoiseFrames() & key).fetch1['frames']
+        (stim_length, stim_dim_x,stim_dim_y) = (BWNoiseFrames() & key).fetch1['stim_length','stim_dim_x','stim_dim_y']
+        stim_freq = (BWNoise() & key).fetch1['freq']
+
+
+
+
+        stimInd = np.zeros(rec_len).astype(int)-1
+
+        if len(triggertimes) != stim_length:
+            print('Something went wrong with the trigger detection!')
+
+        else:
+
+            for n in range(len(triggertimes)-1):
+                stimInd[triggertimes[n]:triggertimes[n+1]-1] += int(n+1)
+            stimInd[triggertimes[len(triggertimes)-1]:triggertimes[len(triggertimes)-1]+(fs/stim_freq)-1] += int(len(triggertimes))
+
+
+        deltat = 1000
+        delta = int(deltat/.1)
+        spiketimes = spiketimes[spiketimes > triggertimes[0]+delta]
+        spiketimes = spiketimes[spiketimes < triggertimes[len(triggertimes)-1] + int(fs/stim_freq)-1]
+        nspikes = len(spiketimes)
+        k = 100
+
+        ste = np.zeros([nspikes,(delta+1000)/k,stim_dim_x*stim_dim_y])
+        for st in range(nspikes):
+            for t in range(-1000,delta,k):
+                ste[st,int((t+1000)/k),:] = np.array(frames[stimInd[spiketimes[st]-t]])
+
+        sta = np.mean(ste,0)
+
+        self.insert1(dict(key,sta=sta))
+
+    def plt_rf(self):
+
+        plt.rcParams.update({'figure.subplot.hspace':.2,'figure.subplot.wspace':.3,'figure.figsize':(15,8),'axes.titlesize':16})
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            sta = (self & key).fetch1['sta']
+            stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x','stim_dim_y']
+            sta_smooth = scimage.filters.gaussian_filter(sta.reshape(sta.shape[0],stimDim[0],stimDim[1]),[0.2,.7,.7]) # reshape and smooth with a gaussian filter
+            sta_norm = sta_smooth/np.std(sta_smooth,0)
+
+            fig, axarr = plt.subplots(2,int(np.ceil(sta.shape[0]/20)))
+            fig.subplots_adjust(hspace=.1,wspace=.1)
+
+            if  (int(np.ceil(sta.shape[0])) % 20 == 0):
+                ax = axarr.reshape(int(np.ceil(sta.shape[0]/10)))
+            else:
+                ax = axarr.reshape(int(np.ceil(sta.shape[0]/10))+1)
+                im = ax[int(np.ceil(sta.shape[0]/10))].imshow(np.zeros([20,15]),cmap = plt.cm.Greys_r,interpolation='none',clim=(-1,1))
+                ax[int(np.ceil(sta.shape[0]/10))].set_xticks([])
+                ax[int(np.ceil(sta.shape[0]/10))].set_yticks([])
+
+            tmp = 1
+
+            with sns.axes_style(style = 'whitegrid'):
+
+                for delt in range(0,sta.shape[0],10):
+
+
+                        im = ax[delt/10].imshow(sta_norm[delt,:,:],
+                                        cmap = plt.cm.coolwarm,clim = (-np.percentile(sta_norm,90),np.percentile(sta_norm,90)),interpolation='none')
+                        ax[delt/10].set_title('$\Delta$ t = ' + str(-(delt-10)*10) + 'ms')
+                        ax[delt/10].set_yticks([])
+                        ax[delt/10].set_xticks([])
+                        tmp += 1
+
+                fig.subplots_adjust(right=0.8)
+                cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
+                cbar = fig.colorbar(im, cax=cbar_ax)
+                cbar.set_label('s.d. units',labelpad = 40,rotation=270)
+
+                plt.suptitle('STA for different time lags\n' + fname,fontsize=16)
+
+
+    def plt_contour(self,tau,x1,x2,y1,y2):
+
+        from matplotlib import ticker
+
+        plt.rcParams.update({
+            'figure.figsize': (10, 8), 'figure.subplot.hspace': .2, 'figure.subplot.wspace': .2, 'axes.titlesize': 16,
+            'axes.labelsize': 18,
+            'xtick.labelsize': 16, 'ytick.labelsize': 16, 'lines.linewidth': 4})
+
+        for key in self.project().fetch.as_dict:
+
+
+            sta = (self & key).fetch1['sta']
+            fname = key['filename']
+
+            stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x','stim_dim_y']
+            sta_smooth = scimage.filters.gaussian_filter(sta.reshape(sta.shape[0],stimDim[0],stimDim[1]),[0.2,.7,.7]) # reshape and smooth with a gaussian filter
+
+            frame = int(10 - tau/10)
+
+
+
+
+            fig = plt.figure()
+            plt.title('$\Delta$ t: ' + str(tau) + '\n' + fname)
+
+            im = plt.imshow(sta_smooth[frame, :, :][x1:x2, y1:y2], interpolation='none',
+                            cmap=plt.cm.Greys_r, extent=(y1, y2, x2, x1), origin='upper')
+            cs = plt.contour(sta_smooth[frame, :, :][x1:x2, y1:y2],
+                             extent=(y1, y2, x2, x1), cmap=plt.cm.coolwarm, origin='upper', linewidth=4)
+
+            cb = plt.colorbar(cs, extend='both', shrink=.8)
+            cbaxes = fig.add_axes([.15, .02, .6, .03])  # [left, bottom, width, height]
+            cbi = plt.colorbar(im, orientation='horizontal', cax=cbaxes)
+
+            tick_locator = ticker.MaxNLocator(nbins=6)
+            cbi.locator = tick_locator
+            cbi.update_ticks()
+
+            cb.locator = tick_locator
+            cb.update_ticks()
