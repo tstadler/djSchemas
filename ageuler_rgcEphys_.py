@@ -908,3 +908,255 @@ class Chirp(dj.Computed):
             axarr[0].set_ylabel('stimulus intensity', labelpad=5)
             axarr[0].set_yticks([0, 127, 250])
             axarr[0].set_xlim(0, loop_duration_s)
+
+
+@schema
+class DSParams(dj.Computed):
+    definition="""
+    -> Recording
+    ---
+    nconditions=8 	: int	# number of directions bar was tested
+    """
+
+    @property
+    def populated_from(self):
+        return Recording() & dict(stim_type='ds')
+
+    def _make_tuples(self,key):
+
+        self.insert1(dict(key,nconditions=8))
+
+@schema
+class DS(dj.Computed):
+    definition="""
+    -> Recording
+    -> DSParams
+    ---
+    hist		    : longblob    # number of spikes per direction sorted as 0° , 180°, 45°, 225°, ...
+    hist_sorted	    : longblob    # number of spikes per direction sorted 0° - 315°
+    dsi			    : double	  # direction selectivity index
+    qi			    : double	  # quality response index
+    """
+
+    @property
+    def populated_from(self):
+
+        return Recording() & dict(stim_type='ds')
+
+    def _make_tuples(self,key):
+
+        # fetch data
+
+        spikes = (Spikes() & key).fetch1['spiketimes']
+        triggertimes = (Trigger() & key).fetch1['triggertimes']
+        nconditions = (DSParams() & key).fetch1['nconditions']
+
+        ntrials = int(len(triggertimes)/nconditions)
+
+        deg = np.array([0,180,45,225,90,270,135,315]) #np.arange(0, 360, 360/nconditions)
+        idx = np.array([0,4,6,2,5,1,7,3])
+
+        true_loop_duration = []
+        for trial in range(1,ntrials):
+            true_loop_duration.append(triggertimes[trial*nconditions] - triggertimes[(trial-1)*nconditions])
+        loop_duration_n =  np.ceil(np.mean(true_loop_duration)) # in sample points
+        #loopDuration_s = loopDuration_n/10000 # in s
+
+
+        spikes_trial = []
+        spikes_normed = []
+        hist = []
+        hist_sorted = []
+
+        for trial in range(ntrials-1):
+            spikes_trial.append(np.array(spikes[(spikes>triggertimes[trial*nconditions]) & (spikes<triggertimes[(trial+1)*nconditions])]))
+            spikes_normed.append(spikes_trial[trial]-triggertimes[trial*nconditions])
+            hist.append(np.histogram(spikes_normed[trial],8,[0,loop_duration_n])[0])
+
+            # sort by condition
+            hist_sorted.append(hist[trial][idx])
+
+        spikes_trial.append(np.array(spikes[(spikes > triggertimes[(ntrials-1)*nconditions])
+                                            & (spikes < triggertimes[(ntrials-1)*nconditions]+loop_duration_n)]))
+        spikes_normed.append(spikes_trial[ntrials-1]-triggertimes[(ntrials-1)*nconditions])
+        hist.append(np.histogram(spikes_normed[ntrials-1],8,[0,loop_duration_n])[0])
+        hist_sorted.append(hist[ntrials-1][idx])
+
+        hist_sum = np.sum(hist,0)
+        r_p = np.max(hist_sum)
+        idx_p = np.where(hist_sum == r_p)[0][0]
+        d_p = deg[idx_p]
+        if (idx_p % 2) == 0:
+            d_n = deg[idx_p + 1]
+            r_n = hist_sum[idx_p + 1]
+        else:
+            d_n = deg[idx_p - 1]
+            r_n = hist_sum[idx_p - 1]
+        dsi = (r_p - r_n)/(r_p + r_n)
+
+        R = np.array(hist).transpose()
+        qi = np.var(np.mean(R,1))/np.mean(np.var(R,0))
+
+        self.insert1(dict(key, hist = np.array(hist),hist_sorted = np.array(hist_sorted),dsi = dsi,qi = qi)) # spikes_trial = np.array(spikes_trial),spikes_normed = np.array(spikes_normed),hist = np.array(hist),hist_sorted = np.array(hist_sorted),dsi = dsi, qi = qi
+
+    def plt_ds(self):
+
+        plt.rcParams.update({'xtick.labelsize': 16, 'ytick.labelsize': 16, 'axes.labelsize': 16, 'axes.titlesize': 20,
+                             'figure.figsize': (10, 8)})
+
+        for key in self.project().fetch.as_dict:
+            hist = (self & key).fetch1['hist']
+            nconditions = (DSParams() & key).fetch1['nconditions']
+            fname = key['filename']
+            qi = (self & key).fetch1['qi']
+            dsi = (self & key).fetch1['dsi']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            deg = np.array([0, 180, 45, 225, 90, 270, 135, 315])
+
+            with sns.axes_style('whitegrid'):
+                fig = plt.figure()
+                plt.suptitle('Directional Tuning\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=18, y=1.1)
+
+                ax = plt.axes(polar=True, axisbg='white')
+                width = .2
+                rads = np.radians(deg) - width / 2
+                counts = np.mean(hist, 0)
+                plt.bar(rads, counts, width=width, facecolor='k')
+
+                ycounts = [round(max(counts) / 2), round(max(counts))]
+                ax.set_theta_direction(-1)
+                ax.set_theta_offset(np.pi / 2)
+                ax.set_yticks(ycounts)
+                ax.grid(color='k', linestyle='--')
+
+                ax.annotate('QI: ' + str("%.2f" % round(qi, 2)), xy=(.85, .2), xycoords='figure fraction', size=16)
+                ax.annotate('DSI: ' + str("%.2f" % round(dsi, 2)), xy=(.9, .3), xycoords='figure fraction', size=16)
+                # ax.annotate('.85,.2', xy = (.85,.2), xycoords = 'figure fraction')
+                # ax.annotate('.9,.3', xy = (.9,.3), xycoords = 'figure fraction')
+
+    def plt_ds_traces(self):
+
+        plt.rcParams.update({'xtick.labelsize': 16, 'ytick.labelsize': 16, 'axes.labelsize': 16, 'axes.titlesize': 20,
+                             'figure.figsize': (15, 8)})
+
+        for key in self.project().fetch.as_dict:
+
+            fname = (Recording() & key).fetch1['filename']
+            ch_trigger = (Recording() & key).fetch1['ch_trigger']
+            ch_voltage = (Recording() & key).fetch1['ch_voltage']
+
+            cell_path = (Cell() & key).fetch1['folder']
+            exp_path = (Experiment() & key).fetch1['path']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            # extract raw data for the given recording
+            full_path = exp_path + cell_path + fname + '.h5'
+            f = h5py.File(full_path, 'r')
+
+            ch_grp_trig = f[ch_trigger]
+            keylist = [key for key in ch_grp_trig.keys()]
+            trigger_trace = ch_grp_trig[keylist[1]]['data'][:]
+            for sec in range(2, len(keylist)):
+                ch_sec_tmp = ch_grp_trig[keylist[sec]]
+                dset = ch_sec_tmp['data'][:]
+                trigger_trace = np.append(trigger_trace, dset)
+
+            ch_grp_v = f[ch_voltage]
+            keylist = [key for key in ch_grp_v.keys()]
+            voltage_trace = ch_grp_v[keylist[1]]['data'][:]
+            for sec in range(2, len(keylist)):
+                ch_sec_tmp = ch_grp_v[keylist[sec]]
+                dset = ch_sec_tmp['data'][:]
+                voltage_trace = np.append(voltage_trace, dset)
+
+            triggertimes = (Trigger() & key).fetch1['triggertimes']
+
+            # stimulus parameter
+            fs = (Recording() & key).fetch1['fs']
+            t_off = 2 * fs  # in s * fs
+            t_on = 2 * fs  # in s
+
+            nconditions = (DSParams() & key).fetch1['nconditions']
+            ntrials = int(len(triggertimes) / nconditions)
+            idx = np.array([0, 4, 6, 2, 5, 1, 7, 3])
+            deg = np.arange(0, 360, 360 / 8).astype(int)
+
+            true_loop_duration = []
+            for trial in range(1, ntrials):
+                true_loop_duration.append(triggertimes[trial * nconditions] - triggertimes[(trial - 1) * nconditions])
+            loop_duration_n = np.ceil(np.mean(true_loop_duration))
+
+            stim = np.zeros(trigger_trace.shape)
+
+            for i in range(len(triggertimes)):
+                stim[triggertimes[i]:triggertimes[i] + t_on] = 1
+
+            v_trace_trial = []
+            stim_trial = []
+            for i in range(len(triggertimes)):
+                v_trace_trial.append(np.array(voltage_trace[triggertimes[i]:triggertimes[i] + t_on + t_off]))
+                stim_trial.append(np.array(stim[triggertimes[i]:triggertimes[i] + t_on + t_off]))
+
+            plt.rcParams.update({'figure.subplot.hspace': .1, 'figure.figsize': (20, 8)})
+
+            N = len(v_trace_trial)
+            fig1, axarr = plt.subplots(int(N / nconditions) + 1, nconditions, sharex=True,
+                                       sharey=True)  # len(triggertimes)
+
+            for i in range(N + nconditions):
+                rowidx = int(np.floor(i / nconditions))
+                colidx = int(i - rowidx * nconditions)
+                if rowidx == 0:
+                    axarr[rowidx, colidx].plot(stim_trial[i] * np.max(v_trace_trial) - np.max(v_trace_trial), 'k')
+                    axarr[rowidx, colidx].set_xticks([])
+                    axarr[rowidx, colidx].set_yticks([])
+                else:
+                    axarr[rowidx, colidx].plot(v_trace_trial[i - nconditions], 'k')
+                    axarr[rowidx, colidx].set_xticks([])
+                    axarr[rowidx, colidx].set_yticks([])
+            plt.suptitle(
+                'Traces sorted by direction (column) and trial (row)\n' + str(exp_date) + ': ' + eye + ': ' + fname,
+                fontsize=16)
+
+            rec_type = (Recording() & key).fetch1['rec_type']
+
+            # Heatmap
+            if rec_type == 'intracell':
+                arr = np.array(v_trace_trial)
+                arr = arr.reshape(ntrials, nconditions, arr.shape[1])
+
+                for trial in range(ntrials):
+                    arr[trial, :, :] = arr[trial, :, :][idx]
+
+                l = []
+                for cond in range(nconditions):
+                    for trial in range(ntrials):
+                        l.append(arr[trial, cond, :])
+
+                fig2, ax = plt.subplots()
+
+                intensity = np.array(l).reshape(ntrials, nconditions, len(l[0]))
+
+                column_labels = np.linspace(0, 4, 5)
+                row_labels = deg.astype(int)
+
+                plt.pcolormesh(np.mean(intensity, 0), cmap=plt.cm.coolwarm)
+                cax = plt.colorbar()
+                cax.set_label('voltage [mV]', rotation=270, labelpad=50)
+                plt.xlabel('time [s]')
+                plt.ylabel('direction [deg]')
+                plt.title('Average membrane potential')
+
+                ax.set_xticks(np.linspace(0, len(l[0]), 5), minor=False)
+                ax.set_yticks(np.arange(intensity.shape[1]) + .5, minor=False)
+
+                ax.invert_yaxis()
+                ax.xaxis.set_ticks_position('bottom')
+
+                ax.set_xticklabels(column_labels, minor=False)
+                ax.set_yticklabels(row_labels, minor=False)
+
