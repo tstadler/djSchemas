@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.ndimage as scimage
 import scipy.signal as scignal
+from IPython.display import display
 
 schema = dj.schema('ageuler_rgcEphys_test3',locals())
 
