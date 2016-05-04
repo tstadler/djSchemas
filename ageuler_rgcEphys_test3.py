@@ -1292,3 +1292,56 @@ class OnOff(dj.Computed):
                 plt.xlabel('time [s]')
                 plt.ylabel('trial')
                 plt.title('Membrane potential')
+
+
+def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,morph,cell_type,data_folder,filename,rec_type,ch_voltage):
+    """
+
+    :param animal_id: str 'ZK0-yyyy-mm-dd'
+    :param sex: str 'F' or 'M'
+    :param date_of_birth: str 'yyyy-mm-dd'
+    :param exp_date: str 'yyyy-mm-dd'
+    :param eye: str 'R' or 'L'
+    :param cell_id: int 1-16
+    :param morph: boolean
+    :param type: str 'putative cell type'
+    :param data_folder: str '/notebooks/Data_write/Data/Stadler/'
+    :param filename: str 'BWNoise'
+    :return: adds the given recording to the mysql schema 'ageuler_rgcEphys'
+    """
+    #from schema import Animal,Experiment,Cell,Recording
+    A = Animal()
+    E = Experiment()
+    C = Cell()
+    R = Recording()
+    try:
+        A.insert1({'animal_id':animal_id,'sex':sex,'date_of_birth':date_of_birth})
+    except Exception as e1:
+        print('Animal already is in db')
+    try:
+        exp_path = data_folder + exp_date + '/' + eye + '/'
+        E.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'path':exp_path})
+
+    except Exception as e2:
+        print('Experiment already in db')
+    try:
+        subexp_path = str(cell_id) + '/'
+        C.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'folder':subexp_path,'morphology':morph,'type':cell_type})
+    except Exception as e3:
+        print('Cell already in db')
+    try:
+        if 'BWNoise' in filename:
+            #fname = 'C' + str(cell_id) + '_' + filename
+            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'bw_noise','rec_type':rec_type})
+        if 'Chirp' in filename:
+            #fname = 'C' + str(cell_id) + '_' + filename
+            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'chirp','rec_type':rec_type})
+        if 'DS' in filename:
+            #fname = 'C' + str(cell_id) + '_' + filename
+            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'ds','rec_type':rec_type})
+        if 'ON' in filename:
+            #fname = 'C' + str(cell_id) + '_' + filename
+            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'on_off','rec_type':rec_type})
+    except Exception as e4:
+        print(e4)
+        print('You already added this entry or the stimulus type was unknown')
