@@ -1295,7 +1295,7 @@ class OnOff(dj.Computed):
                 plt.title('Membrane potential')
 
 
-def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,morph,cell_type,data_folder,filename,rec_type,ch_voltage):
+def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filename,rec_type):
     """
 
     :param animal_id: str 'ZK0-yyyy-mm-dd'
@@ -1327,22 +1327,34 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,morph,cell_type,da
         print('Experiment already in db')
     try:
         subexp_path = str(cell_id) + '/'
+        print(subexp_path)
+        morph = bool(int(input('Morphology of this cell was recorded? ')))
+        cell_type = str(input('Any guess for the cell type? '))
+
         C.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'folder':subexp_path,'morphology':morph,'type':cell_type})
     except Exception as e3:
         print('Cell already in db')
     try:
         if 'BWNoise' in filename:
-            #fname = 'C' + str(cell_id) + '_' + filename
-            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'bw_noise','rec_type':rec_type})
+            rec_type = str(input('Recording type? (extracell/intracell): '))
+            ch_voltage = str(input('Name of the recording channel containing the voltage signal? '))
+            ch_trigger = str(input('Name of the recording channel containing the trigger signal? '))
+            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'bw_noise','rec_type':rec_type,'ch_voltage':ch_voltage,'ch_trigger':ch_trigger})
         if 'Chirp' in filename:
-            #fname = 'C' + str(cell_id) + '_' + filename
-            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'chirp','rec_type':rec_type})
+            rec_type = str(input('Recording type? (extracell/intracell): '))
+            ch_voltage = str(input('Name of the recording channel containing the voltage signal? '))
+            ch_trigger = str(input('Name of the recording channel containing the trigger signal? '))
+            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'chirp','rec_type':rec_type,'ch_voltage':ch_voltage,'ch_trigger':ch_trigger})
         if 'DS' in filename:
-            #fname = 'C' + str(cell_id) + '_' + filename
-            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'ds','rec_type':rec_type})
+            rec_type = str(input('Recording type? (extracell/intracell): '))
+            ch_voltage = str(input('Name of the recording channel containing the voltage signal? '))
+            ch_trigger = str(input('Name of the recording channel containing the trigger signal? '))
+            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'ds','rec_type':rec_type,'ch_voltage':ch_voltage,'ch_trigger':ch_trigger})
         if 'ON' in filename:
-            #fname = 'C' + str(cell_id) + '_' + filename
-            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'on_off','rec_type':rec_type})
+            rec_type = str(input('Recording type? (extracell/intracell): '))
+            ch_voltage = str(input('Name of the recording channel containing the voltage signal? '))
+            ch_trigger = str(input('Name of the recording channel containing the trigger signal? '))
+            R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'on_off','rec_type':rec_type,'ch_voltage':ch_voltage,'ch_trigger':ch_trigger})
     except Exception as e4:
         print(e4)
         print('You already added this entry or the stimulus type was unknown')
