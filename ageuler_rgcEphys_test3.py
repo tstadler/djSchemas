@@ -1310,30 +1310,36 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
     :param filename: str 'BWNoise'
     :return: adds the given recording to the mysql schema 'ageuler_rgcEphys'
     """
-    #from schema import Animal,Experiment,Cell,Recording
+
     A = Animal()
     E = Experiment()
     C = Cell()
     R = Recording()
-    try:
-        A.insert1({'animal_id':animal_id,'sex':sex,'date_of_birth':date_of_birth})
-    except Exception as e1:
-        print('Animal already is in db')
-    try:
-        exp_path = data_folder + exp_date + '/' + eye + '/'
-        E.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'path':exp_path})
 
-    except Exception as e2:
-        print('Experiment already in db')
-    try:
-        subexp_path = str(cell_id) + '/'
-        print(subexp_path)
-        morph = bool(int(input('Morphology of this cell was recorded? ')))
-        cell_type = str(input('Any guess for the cell type? '))
+    if len(A & dict(animal_id = animal_id)) == 0:
+        try:
+            A.insert1({'animal_id':animal_id,'sex':sex,'date_of_birth':date_of_birth})
+        except Exception as e1:
+            print(e1)
 
-        C.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'folder':subexp_path,'morphology':morph,'type':cell_type})
-    except Exception as e3:
-        print('Cell already in db')
+    if len(E & dict(animal_id=animal_id,exp_date=exp_date)) == 0:
+        try:
+            exp_path = data_folder + exp_date + '/' + eye + '/'
+            E.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'path':exp_path})
+
+        except Exception as e2:
+            print(e2)
+
+    if len(C & dict(animal_id = animal_id,exp_date = exp_date, cell_id=cell_id)) == 0:
+        try:
+            subexp_path = str(cell_id) + '/'
+            print('Cell id: ', cell_id)
+            morph = bool(int(input('Morphology of this cell was recorded? ')))
+            cell_type = str(input('Any guess for the cell type? '))
+            C.insert1({'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'cell_id': cell_id, 'folder': subexp_path,
+                   'morphology': morph, 'type': cell_type})
+        except Exception as e3:
+            print(e3)
     try:
         if 'BWNoise' in filename:
             rec_type = str(input('Recording type? (extracell/intracell): '))
@@ -1357,4 +1363,3 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
             R.insert1({'animal_id':animal_id,'exp_date':exp_date,'eye':eye,'cell_id':cell_id,'filename':filename,'stim_type':'on_off','rec_type':rec_type,'ch_voltage':ch_voltage,'ch_trigger':ch_trigger})
     except Exception as e4:
         print(e4)
-        print('You already added this entry or the stimulus type was unknown')
