@@ -1328,6 +1328,7 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
     if len(E & dict(animal_id=animal_id,exp_date=exp_date,eye = eye)) == 0:
         print('Experiment new')
         rec_type = str(input('Recording type? (extracell/intracell): '))
+        print(rec_type)
         ch_voltage = str(input('Name of the recording channel containing the voltage signal? '))
         ch_trigger = str(input('Name of the recording channel containing the trigger signal? '))
         try:
@@ -1338,6 +1339,8 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
             print(e2)
     else:
         print('Experimental day already in db')
+        rec_type = str(input('Recording type? (extracell/intracell): '))
+        print(rec_type)
 
     if len(C & dict(animal_id = animal_id,exp_date = exp_date, cell_id=cell_id)) == 0:
         print('Cell id new')
