@@ -1295,7 +1295,7 @@ class OnOff(dj.Computed):
                 plt.title('Membrane potential')
 
 
-def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filename):
+def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,rec_type, ch_voltage, ch_trigger,filename):
     """
 
     :param animal_id: str 'ZK0-yyyy-mm-dd'
@@ -1327,9 +1327,6 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
 
     if len(E & dict(animal_id=animal_id, exp_date=exp_date, eye=eye)) == 0:
         print('Experiment new')
-        rec_type = str(input('Recording type? (extracell/intracell): '))
-        ch_voltage = str(input('Name of the recording channel containing the voltage signal? '))
-        ch_trigger = str(input('Name of the recording channel containing the trigger signal? '))
         try:
             exp_path = data_folder + exp_date + '/' + eye + '/'
             E.insert1({'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'path': exp_path})
@@ -1338,12 +1335,6 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
             print(e2)
     else:
         print('Experimental day already in db')
-        if 'rec_type' not in locals():
-            rec_type = str(input('Recording type? (extracell/intracell): '))
-            ch_voltage = str(input('Name of the recording channel containing the voltage signal? '))
-            ch_trigger = str(input('Name of the recording channel containing the trigger signal? '))
-
-
 
     if len(C & dict(animal_id=animal_id, exp_date=exp_date, cell_id=cell_id)) == 0:
         print('Cell id new')
