@@ -1316,11 +1316,13 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
     C = Cell()
     R = Recording()
 
-    if len(A & dict(animal_id = animal_id)) == 0:
+    if (len(A & dict(animal_id = animal_id)) == 0):
         try:
             A.insert1({'animal_id':animal_id,'sex':sex,'date_of_birth':date_of_birth})
         except Exception as e1:
             print(e1)
+    else:
+        print('Animal id already in use.')
 
     if len(E & dict(animal_id=animal_id,exp_date=exp_date)) == 0:
         try:
