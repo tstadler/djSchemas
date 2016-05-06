@@ -1316,6 +1316,7 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
     C = Cell()
     R = Recording()
 
+
     if (len(A & dict(animal_id = animal_id)) == 0):
         print('Animal new')
         try:
@@ -1339,8 +1340,9 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
             print(e2)
     else:
         print('Experimental day already in db')
-        rec_type = str(input('Recording type? (extracell/intracell): '))
-        print(rec_type)
+        if not 'rec_type' in locals():
+            rec_type = str(input('Recording type? (extracell/intracell): '))
+            print(rec_type)
 
     if len(C & dict(animal_id = animal_id,exp_date = exp_date, cell_id=cell_id)) == 0:
         print('Cell id new')
