@@ -1338,11 +1338,8 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
             print(e2)
     else:
         print('Experimental day already in db')
-        if not 'rec_type' in locals():
-            rec_type = str(input('Recording type? (extracell/intracell): '))
-            ch_voltage = str(input('Name of the recording channel containing the voltage signal? '))
-            ch_trigger = str(input('Name of the recording channel containing the trigger signal? '))
-            print(rec_type)
+
+
 
     if len(C & dict(animal_id=animal_id, exp_date=exp_date, cell_id=cell_id)) == 0:
         print('Cell id new')
@@ -1361,6 +1358,10 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filena
 
     if len(R & dict(animal_id=animal_id, exp_date=exp_date, eye=eye, cell_id=cell_id, filename=filename)) == 0:
         print('Recording new')
+        if not 'rec_type' in globals():
+            rec_type = str(input('Recording type? (extracell/intracell): '))
+            ch_voltage = str(input('Name of the recording channel containing the voltage signal? '))
+            ch_trigger = str(input('Name of the recording channel containing the trigger signal? '))
         try:
             if 'BWNoise' in filename:
                 R.insert1(
