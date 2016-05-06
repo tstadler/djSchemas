@@ -14,7 +14,7 @@ class Animal(dj.Manual):
     definition = """
     # Basic animal info
 
-    animal_id					:varchar(20)   																# unique ID given to the animal
+    animal_id					:varchar(50)   																# unique ID given to the animal
     ---
     species="mouse"				:enum("mouse","rat","zebrafish")											# animal species
     animal_line="PvCreAi9"		:enum("PvCreAi9","B1/6","ChATCre","PvCreTdT","PCP2TdT","ChATCreTdT","WT")	# transgnenetic animal line, here listed: mouse lines
