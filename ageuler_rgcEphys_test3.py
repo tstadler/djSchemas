@@ -1295,7 +1295,7 @@ class OnOff(dj.Computed):
                 plt.title('Membrane potential')
 
 
-def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filename,rec_type):
+def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,filename):
     """
 
     :param animal_id: str 'ZK0-yyyy-mm-dd'
