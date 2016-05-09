@@ -581,8 +581,8 @@ class STA(dj.Computed):
 
         frames = (BWNoiseFrames() & key).fetch1['frames']
         (stim_length, stim_dim_x,stim_dim_y) = (BWNoiseFrames() & key).fetch1['stim_length','stim_dim_x','stim_dim_y']
-        stim_freq, stim_dim_x,stim_dim_y = (BWNoise() & key).fetch1['freq','stim_dim_x','stim_dim_y']
-
+        stim_freq = (BWNoise() & key).fetch1['freq']
+        stim_dim_x, stim_dim_y = (BWNoiseFrames() & key).fetch1['stim_dim_x','stim_dim_y']
 
 
 
