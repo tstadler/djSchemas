@@ -71,7 +71,7 @@ class Recording(dj.Manual):
     filename		: varchar(200) 		  						# name of the converted recording file
     ---
     rec_type                            : enum('intracell','extracell')                     # recording is an intra- or juxtacellular recordin
-    stim_type							: enum('bw_noise','chirp','ds','on_off')	# type of the stimulus played during recording
+    stim_type							: enum('bw_noise','chirp','ds','on_off','unknown')	# type of the stimulus played during recording
     fs=10000							: int					  					# sampling rate of the recording
     ch_voltage="Vm_scaled AI #10"		: varchar(50)								# name of the voltage channel for this recording
     ch_trigger="LightTrig Blanking"		: varchar(50)								# name of the channel containing the light trigger signal
