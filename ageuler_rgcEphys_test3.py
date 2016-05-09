@@ -561,7 +561,11 @@ class STA(dj.Computed):
     # Calculate the spike-triggered ensemble from noise recording
     -> Recording
     ---
-    sta    : longblob	# spike-triggered average
+    sta     : longblob	# spike-triggered average
+    kernel  : longblob  # time kernel from center pixel and its neighbours
+    u       : longblob  # first temporal filter component
+    s       : longblob  # singular values
+    v       : longblob  # first spatial filter component
     """
     @property
     def populated_from(self):
@@ -577,7 +581,8 @@ class STA(dj.Computed):
 
         frames = (BWNoiseFrames() & key).fetch1['frames']
         (stim_length, stim_dim_x,stim_dim_y) = (BWNoiseFrames() & key).fetch1['stim_length','stim_dim_x','stim_dim_y']
-        stim_freq = (BWNoise() & key).fetch1['freq']
+        stim_freq, stim_dim_x,stim_dim_y = (BWNoise() & key).fetch1['freq','stim_dim_x','stim_dim_y']
+
 
 
 
@@ -606,9 +611,39 @@ class STA(dj.Computed):
             for t in range(-1000,delta,k):
                 ste[st,int((t+1000)/k),:] = np.array(frames[stimInd[spiketimes[st]-t]])
 
-        sta = np.mean(ste,0)
+        sta_raw = np.mean(ste,0)
 
-        self.insert1(dict(key,sta=sta))
+        sta = scimage.filters.gaussian_filter(sta_raw.reshape(sta_raw.shape[0],stim_dim_x, stim_dim_y), [.2, .7, .7])
+
+        # calculate time kernel from center pixel
+        sd_map = np.std(sta, 0)
+        idx_center = np.where(sd_map == np.max(sd_map))
+        kernel = sta[:, idx_center[0], idx_center[1]]
+
+        try:
+
+            (u, s, v) = np.linalg.svd(sta_raw)
+
+        except Exception as e_svd:
+
+            print(e_svd)
+            u = np.zeros([sta_raw.shape[0], sta_raw.shape[0]])
+            v = np.zeros([sta_raw.shape[1], sta_raw.shape[1]])
+
+        if np.sign(np.mean(u[:, 0])) != np.sign(np.mean(kernel)):
+            u = -1 * u
+
+        if np.mean(kernel) < 0:
+            idx_rf = np.where(kernel == min(kernel))[0][0]
+        else:
+            idx_rf = np.where(kernel == max(kernel))[0][0]
+
+        if np.sign(np.mean(v[0, :])) != np.sign(np.mean(sta_raw[idx_rf, :])):
+            v = -1 * v
+
+
+
+        self.insert1(dict(key,sta=sta_raw, kernel = kernel, u = u[:,0], s = np.diag(s), v = v[0,:]))
 
     def plt_rf(self):
 
@@ -702,6 +737,92 @@ class STA(dj.Computed):
             cb.locator = tick_locator
             cb.update_ticks()
 
+    def plt_svd(self, tau, x1, x2, y1, y2):
+
+        for key in self.project().fetch.as_dict:
+
+            sta = (self & key).fetch1['sta']
+            kernel = (self & key).fetch1['kernel']
+            u = (self & key).fetch1['u']
+            v = (self & key).fetch1['v']
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x', 'stim_dim_y']
+
+
+            sta_smooth = scimage.filters.gaussian_filter(sta.reshape(sta.shape[0], stimDim[0], stimDim[1]),
+                                                         [0.2, .7, .7])  # reshape and smooth with a gaussian filter
+
+            frame = int(10 - tau / 10)
+
+            from matplotlib import ticker
+            import matplotlib
+
+            my_cmap = plt.cm.get_cmap('coolwarm')
+            norm = matplotlib.colors.Normalize(min(kernel), max(kernel))
+            color_off = my_cmap(norm(min(kernel) + .02))
+            color_on = my_cmap(norm(max(kernel) - .02))
+
+            plt.rcParams.update(
+                {'figure.figsize': (10, 8), 'figure.subplot.hspace': 0, 'figure.subplot.wspace': .2,
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 18,
+                 'xtick.labelsize': 16, 'ytick.labelsize': 16, 'lines.linewidth': 4, 'figure.figsize': (15, 8),
+                 'figure.subplot.hspace': .2, 'figure.subplot.wspace': 0, 'ytick.major.pad': 10})
+
+            fig = plt.figure()
+
+            fig.add_subplot(2, 3, 1)
+
+            im = plt.imshow(sta[frame, :, :][x1:x2, y1:y2], interpolation='none',
+                            cmap=plt.cm.coolwarm, extent=(y1, y2, x2, x1), origin='upper')
+        cbi = plt.colorbar(im)
+        plt.xticks([])
+        plt.yticks([])
+        tick_locator = ticker.MaxNLocator(nbins=6)
+        cbi.locator = tick_locator
+        cbi.update_ticks()
+
+        fig.add_subplot(2, 2, 2)
+        deltat = 1000  # in ms
+        t = np.linspace(100, -deltat, len(kernel))
+        if np.sign(np.mean(kernel)) == -1:
+            plt.plot(t, kernel, color='b')
+        else:
+            plt.plot(t, kernel, color='r')
+
+        plt.locator_params(axis='y', nbins=4)
+        ax = fig.gca()
+        ax.set_xticklabels([])
+        ax.set_xlim([100, -deltat])
+        plt.ylabel('stimulus intensity', labelpad=20)
+
+        fig.add_subplot(2, 3, 4)
+        im = plt.imshow(v.reshape(sta.shape[1], sta.shape[2])[x1:x2, y1:y2], interpolation='none',
+                        cmap=plt.cm.coolwarm, extent=(y1, y2, x2, x1), origin='upper')
+        cbi = plt.colorbar(im)
+        plt.xticks([])
+        plt.yticks([])
+        tick_locator = ticker.MaxNLocator(nbins=6)
+        cbi.locator = tick_locator
+        cbi.update_ticks()
+        plt.xticks([])
+        plt.yticks([])
+
+        fig.add_subplot(2, 2, 4)
+
+        if np.sign(np.mean(u)) == -1:
+            plt.plot(t, u, color='b')
+        else:
+            plt.plot(t, u, color='r')
+
+        plt.locator_params(axis='y', nbins=4)
+        ax = fig.gca()
+        ax.set_xlim([100, -deltat])
+        plt.xlabel('time [ms]', labelpad=10)
+        plt.ylabel('stimulus intensity', labelpad=20)
 
 @schema
 class ChirpParams(dj.Computed):
