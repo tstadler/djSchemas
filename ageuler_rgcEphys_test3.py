@@ -6,6 +6,8 @@ import seaborn as sns
 import scipy.ndimage as scimage
 import scipy.signal as scignal
 from IPython.display import display
+from matplotlib import ticker
+import matplotlib
 
 schema = dj.schema('ageuler_rgcEphys_test3',locals())
 
@@ -753,8 +755,7 @@ class STA(dj.Computed):
 
             stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x', 'stim_dim_y']
 
-            from matplotlib import ticker
-            import matplotlib
+
 
             my_cmap = plt.cm.get_cmap('coolwarm')
             norm = matplotlib.colors.Normalize(min(kernel), max(kernel))
@@ -762,11 +763,15 @@ class STA(dj.Computed):
             color_on = my_cmap(norm(max(kernel) - .02))
 
             plt.rcParams.update(
-                {'figure.figsize': (10, 8), 'figure.subplot.hspace': 0, 'figure.subplot.wspace': .2,
-                 'axes.titlesize': 16,
+                {'axes.titlesize': 16,
                  'axes.labelsize': 18,
-                 'xtick.labelsize': 16, 'ytick.labelsize': 16, 'lines.linewidth': 4, 'figure.figsize': (15, 8),
-                 'figure.subplot.hspace': .2, 'figure.subplot.wspace': 0, 'ytick.major.pad': 10})
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'lines.linewidth': 4,
+                 'figure.figsize': (15, 8),
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .2,
+                 'ytick.major.pad': 10})
 
             sta_smooth = scimage.filters.gaussian_filter(sta.reshape(sta.shape[0], stimDim[0], stimDim[1]),
                                                          [0.2, .7, .7])  # reshape and smooth with a gaussian filter
@@ -776,7 +781,7 @@ class STA(dj.Computed):
 
 
             fig = plt.figure()
-            plt.title(' STA at $\Delta$ t: ' + str(tau) + ' (upper panel) and SVD (lower panel) \n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
+            plt.title(' STA at $\Delta$ t: ' + str(tau) + ' (upper panel) and SVD (lower panel) \n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16, y = 1.1)
 
             fig.add_subplot(2, 3, 1)
 
