@@ -776,7 +776,7 @@ class STA(dj.Computed):
 
             fig.add_subplot(2, 3, 1)
 
-            im = plt.imshow(sta[frame, :, :][x1:x2, y1:y2], interpolation='none',
+            im = plt.imshow(sta_smooth[frame, :, :][x1:x2, y1:y2], interpolation='none',
                             cmap=plt.cm.coolwarm, extent=(y1, y2, x2, x1), origin='upper')
         cbi = plt.colorbar(im)
         plt.xticks([])
@@ -800,7 +800,7 @@ class STA(dj.Computed):
         plt.ylabel('stimulus intensity', labelpad=20)
 
         fig.add_subplot(2, 3, 4)
-        im = plt.imshow(v.reshape(sta.shape[1], sta.shape[2])[x1:x2, y1:y2], interpolation='none',
+        im = plt.imshow(v.reshape(stimDim[0], stimDim[1])[x1:x2, y1:y2], interpolation='none',
                         cmap=plt.cm.coolwarm, extent=(y1, y2, x2, x1), origin='upper')
         cbi = plt.colorbar(im)
         plt.xticks([])
