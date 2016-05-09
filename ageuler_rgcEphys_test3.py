@@ -269,7 +269,8 @@ class Spikes(dj.Computed):
                         display(fig_v, fig_dv)
 
                         adjust1 = bool(int(input('Adjust threshold again? (Yes: 1, No: 0): ')))
-                        plt.close(fig_v, fig_dv)
+                        plt.close(fig_v)
+                        plt.close(fig_dv)
 
 
 
