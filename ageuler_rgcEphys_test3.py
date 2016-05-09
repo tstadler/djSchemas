@@ -1356,7 +1356,7 @@ class OnOff(dj.Computed):
         spikes_norm = []
 
         for tr in triggertimes:
-            spikes_norm.append(spiketimes[spiketimes > tr & spiketimes <  tr + 2*t_off + 2*t_on])
+            spikes_norm.append(spiketimes[(spiketimes > tr) & (spiketimes <  tr + 2*t_off + 2*t_on)])
             spikes_off.append(spiketimes[(spiketimes > tr) & (spiketimes < tr + t_off)])
             spikes_on.append(spiketimes[(spiketimes > tr + t_off) & (spiketimes < tr + t_off + 2 * t_on)])
 
