@@ -781,7 +781,7 @@ class STA(dj.Computed):
 
 
             fig = plt.figure()
-            fig.suptitle(' STA at $\Delta$ t: ' + str(tau) + ' (upper panel) and SVD (lower panel) \n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16, y = 1.1)
+            fig.suptitle(' STA at $\Delta$ t: ' + str(tau) + ' ms (upper panel) and SVD (lower panel) \n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16, y = 1.1)
 
             fig.add_subplot(2, 3, 1)
 
