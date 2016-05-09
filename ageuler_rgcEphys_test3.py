@@ -182,8 +182,8 @@ class Spikes(dj.Computed):
 
             rec_len = len(voltage_trace)
 
-            start = 0
-            end = 30
+            start = 30
+            end = 60
 
             fig_v = self.show_spiketimes(voltage_trace, spiketimes, start, end, fs)
 
@@ -237,6 +237,41 @@ class Spikes(dj.Computed):
 
                         adjust1 = bool(int(input('Adjust threshold again? (Yes: 1, No: 0): ')))
                         plt.close(fig_v)
+
+                if rec_type == 'intracell':
+
+                    adjust1 = True
+
+                    while adjust1:
+                        alpha = int(input('Scale factor for threshold: '))
+
+                        d_voltage = np.append(np.array(np.diff(voltage_trace)), np.array(0))
+                        d_sigma = np.median(np.abs(d_voltage + np.abs(min(d_voltage))) / (.6745))
+
+                        d_tmp = np.array(d_voltage + np.abs(min(d_voltage)))
+
+                        d_tmp[d_tmp < alpha * d_sigma] = 0
+                        d_tmp[d_tmp > alpha * d_sigma] = 1
+
+
+                        d_tmp = d_tmp.astype(int)
+                        d_tmp2 = np.append(d_tmp[1:len(d_tmp)], np.array([0], int))
+
+                        d_dif = d_tmp2 - d_tmp
+
+                        spiketimes = np.where(d_dif == -1)[0]
+                        print('Number of spikes: ', len(spiketimes))
+                        print('Threshold for differentiated signal was: ', d_sigma*alpha)
+
+                        fig_v = self.show_spiketimes(voltage_trace, spiketimes, start, end, fs)
+                        fig_dv = self.show_spiketimes(d_voltage, spiketimes, start, end, fs)
+
+                        display(fig_v, fig_dv)
+
+                        adjust1 = bool(int(input('Adjust threshold again? (Yes: 1, No: 0): ')))
+                        plt.close(fig_v, fig_dv)
+
+
 
             # insert
             self.insert1(dict(key, spiketimes=spiketimes, rec_len=len(voltage_trace),nspikes=len(spiketimes)))
