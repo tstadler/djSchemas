@@ -1503,6 +1503,10 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,rec_ty
                 R.insert1(
                     {'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'cell_id': cell_id, 'filename': filename,
                      'stim_type': 'on_off', 'rec_type': rec_type, 'ch_voltage': ch_voltage, 'ch_trigger': ch_trigger})
+            else:
+                R.insert1(
+                    {'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'cell_id': cell_id, 'filename': filename,
+                     'stim_type': 'unknown', 'rec_type': rec_type, 'ch_voltage': ch_voltage, 'ch_trigger': ch_trigger})
         except Exception as e4:
             print(e4)
     else:
