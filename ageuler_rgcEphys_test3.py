@@ -739,6 +739,8 @@ class STA(dj.Computed):
 
     def plt_svd(self, tau, x1, x2, y1, y2):
 
+
+
         for key in self.project().fetch.as_dict:
 
             sta = (self & key).fetch1['sta']
@@ -750,12 +752,6 @@ class STA(dj.Computed):
             eye = (Experiment() & key).fetch1['eye']
 
             stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x', 'stim_dim_y']
-
-
-            sta_smooth = scimage.filters.gaussian_filter(sta.reshape(sta.shape[0], stimDim[0], stimDim[1]),
-                                                         [0.2, .7, .7])  # reshape and smooth with a gaussian filter
-
-            frame = int(10 - tau / 10)
 
             from matplotlib import ticker
             import matplotlib
@@ -772,57 +768,64 @@ class STA(dj.Computed):
                  'xtick.labelsize': 16, 'ytick.labelsize': 16, 'lines.linewidth': 4, 'figure.figsize': (15, 8),
                  'figure.subplot.hspace': .2, 'figure.subplot.wspace': 0, 'ytick.major.pad': 10})
 
+            sta_smooth = scimage.filters.gaussian_filter(sta.reshape(sta.shape[0], stimDim[0], stimDim[1]),
+                                                         [0.2, .7, .7])  # reshape and smooth with a gaussian filter
+
+            frame = int(10 - tau / 10)
+
+
+
             fig = plt.figure()
 
             fig.add_subplot(2, 3, 1)
 
             im = plt.imshow(sta_smooth[frame, :, :][x1:x2, y1:y2], interpolation='none',
                             cmap=plt.cm.coolwarm, extent=(y1, y2, x2, x1), origin='upper')
-        cbi = plt.colorbar(im)
-        plt.xticks([])
-        plt.yticks([])
-        tick_locator = ticker.MaxNLocator(nbins=6)
-        cbi.locator = tick_locator
-        cbi.update_ticks()
+            cbi = plt.colorbar(im)
+            plt.xticks([])
+            plt.yticks([])
+            tick_locator = ticker.MaxNLocator(nbins=6)
+            cbi.locator = tick_locator
+            cbi.update_ticks()
 
-        fig.add_subplot(2, 2, 2)
-        deltat = 1000  # in ms
-        t = np.linspace(100, -deltat, len(kernel))
-        if np.sign(np.mean(kernel)) == -1:
-            plt.plot(t, kernel, color='b')
-        else:
-            plt.plot(t, kernel, color='r')
+            fig.add_subplot(2, 2, 2)
+            deltat = 1000  # in ms
+            t = np.linspace(100, -deltat, len(kernel))
+            if np.sign(np.mean(kernel)) == -1:
+                plt.plot(t, kernel, color='b')
+            else:
+                plt.plot(t, kernel, color='r')
 
-        plt.locator_params(axis='y', nbins=4)
-        ax = fig.gca()
-        ax.set_xticklabels([])
-        ax.set_xlim([100, -deltat])
-        plt.ylabel('stimulus intensity', labelpad=20)
+            plt.locator_params(axis='y', nbins=4)
+            ax = fig.gca()
+            ax.set_xticklabels([])
+            ax.set_xlim([100, -deltat])
+            plt.ylabel('stimulus intensity', labelpad=20)
 
-        fig.add_subplot(2, 3, 4)
-        im = plt.imshow(v.reshape(stimDim[0], stimDim[1])[x1:x2, y1:y2], interpolation='none',
-                        cmap=plt.cm.coolwarm, extent=(y1, y2, x2, x1), origin='upper')
-        cbi = plt.colorbar(im)
-        plt.xticks([])
-        plt.yticks([])
-        tick_locator = ticker.MaxNLocator(nbins=6)
-        cbi.locator = tick_locator
-        cbi.update_ticks()
-        plt.xticks([])
-        plt.yticks([])
+            fig.add_subplot(2, 3, 4)
+            im = plt.imshow(v.reshape(stimDim[0], stimDim[1])[x1:x2, y1:y2], interpolation='none',
+                            cmap=plt.cm.coolwarm, extent=(y1, y2, x2, x1), origin='upper')
+            cbi = plt.colorbar(im)
+            plt.xticks([])
+            plt.yticks([])
+            tick_locator = ticker.MaxNLocator(nbins=6)
+            cbi.locator = tick_locator
+            cbi.update_ticks()
+            plt.xticks([])
+            plt.yticks([])
 
-        fig.add_subplot(2, 2, 4)
+            fig.add_subplot(2, 2, 4)
 
-        if np.sign(np.mean(u)) == -1:
-            plt.plot(t, u, color='b')
-        else:
-            plt.plot(t, u, color='r')
+            if np.sign(np.mean(u)) == -1:
+                plt.plot(t, u, color='b')
+            else:
+                plt.plot(t, u, color='r')
 
-        plt.locator_params(axis='y', nbins=4)
-        ax = fig.gca()
-        ax.set_xlim([100, -deltat])
-        plt.xlabel('time [ms]', labelpad=10)
-        plt.ylabel('stimulus intensity', labelpad=20)
+            plt.locator_params(axis='y', nbins=4)
+            ax = fig.gca()
+            ax.set_xlim([100, -deltat])
+            plt.xlabel('time [ms]', labelpad=10)
+            plt.ylabel('stimulus intensity', labelpad=20)
 
 @schema
 class ChirpParams(dj.Computed):
