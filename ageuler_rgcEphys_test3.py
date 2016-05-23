@@ -1463,13 +1463,14 @@ class OnOff(dj.Computed):
                 plt.title('Membrane potential')
 
 
-def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,rec_type, ch_voltage, ch_trigger,filename):
+def addEntry(animal_id,sex,date_of_birth,exp_date,experimenter,eye,cell_id,data_folder,rec_type, ch_voltage, ch_trigger,filename):
     """
 
     :param animal_id: str 'ZK0-yyyy-mm-dd'
     :param sex: str 'F' or 'M'
     :param date_of_birth: str 'yyyy-mm-dd'
     :param exp_date: str 'yyyy-mm-dd'
+    :param experimenter str 'tstadler' who did the experiment?
     :param eye: str 'R' or 'L'
     :param cell_id: int 1-16
     :param morph: boolean
@@ -1497,7 +1498,7 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,eye,cell_id,data_folder,rec_ty
         print('Experiment new')
         try:
             exp_path = data_folder + exp_date + '/' + eye + '/'
-            E.insert1({'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'path': exp_path})
+            E.insert1({'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'path': exp_path,'experimenter':experimenter})
 
         except Exception as e2:
             print(e2)
