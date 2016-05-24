@@ -261,7 +261,7 @@ class Overlay(dj.Computed):
             cell_id = (Cell() & key).fetch1['cell_id']
 
             line_pad = np.ma.masked_where(morph_pad == 0, morph_pad)
-            line_shift = np.ma.masked_where(morph_pad == 0, morph_shift)
+            line_shift = np.ma.masked_where(morph_shift == 0, morph_shift)
 
             clim = (np.min(morph_pad), np.max(morph_pad) * .2)
 
