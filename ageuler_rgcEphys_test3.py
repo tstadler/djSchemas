@@ -104,6 +104,28 @@ class Morph(dj.Computed):
 
         self.insert1(dict(key, stack = stack, scan_z = stack.shape[0], scan_y = stack.shape[1], scan_x = stack.shape[2], zoom = zoom))
 
+    def plt_morph(self):
+
+        plt.rcParams.update(
+            {'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .3,
+             'figure.figsize': (10, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 14}
+        )
+
+        for key in self.project().fetch.as_dict:
+
+            stack = (self & key).fetch1['stack']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
+            morph = np.mean(stack,0)
+
+            plt.imshow(morph, cmap=plt.cm.gray_r, clim=(0, .01))
+            plt.suptitle('Mean over binarized stack in z-axis\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
 
 
 
