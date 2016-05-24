@@ -246,8 +246,8 @@ class Overlay(dj.Computed):
                 'figure.figsize': (15, 8),
                 'figure.subplot.hspace': .2,
                 'figure.subplot.wspace': .2,
-                'axes.titlesize': 20,
-                'axes.labelsize': 18
+                'axes.titlesize': 16,
+                'axes.labelsize': 14
             })
 
             morph_pad = (self & key).fetch1['stack_pad']
@@ -281,7 +281,7 @@ class Overlay(dj.Computed):
 
             ax[1].set_xticklabels([])
             ax[1].set_yticklabels([])
-            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.05)
+            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1)
 
             plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),
                          fontsize=16)
