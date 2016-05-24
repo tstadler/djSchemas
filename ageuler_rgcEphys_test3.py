@@ -78,6 +78,7 @@ class Morph(dj.Computed):
     zoom    :int        # zoom factor
     """
 
+    @property
     def populated_from(self):
         return Cell() & dict(morphology = True)
 
