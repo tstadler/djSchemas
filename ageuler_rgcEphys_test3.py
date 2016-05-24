@@ -124,7 +124,8 @@ class Morph(dj.Computed):
 
             morph = np.mean(stack,0)
 
-            plt.imshow(morph, cmap=plt.cm.gray_r, clim=(0, .01))
+            fig,ax = plt.subplots()
+            ax.imshow(morph, cmap=plt.cm.gray_r, clim=(0, .01))
             plt.suptitle('Mean over binarized stack in z-axis\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
 
 
