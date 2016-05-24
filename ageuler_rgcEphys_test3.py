@@ -71,7 +71,7 @@ class Morph(dj.Computed):
     # Reconstructed morphology of the cell as a line-stack
     -> Cell
     ---
-    stack   :longblob       # array (scan_z x scan_y x scan_x)
+    stack   :longblob       # array (scan_z x scan_x x scan_y)
     scan_z  :int            # number of consecutive frames in depth
     scan_y  :int            # scan field y dim
     scan_x  :int            # scan field x dim
@@ -127,6 +127,25 @@ class Morph(dj.Computed):
             fig = plt.figure()
             plt.imshow(morph, cmap=plt.cm.gray_r, clim=(0, .01))
             plt.suptitle('Mean over binarized stack in z-axis\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+@schema
+class Overlay(dj.Computed):
+
+    definition="""
+    # Overlay of linestack and receptive field map
+
+    -> Morph
+    ---
+    stack_pad   :longblob   # morphology padded to rf map size
+    stack_shift :longblob   # morphology with com shifted onto rf center
+    rf_pad      :longblob   # receptive field map upsampled to morph resolution
+
+    """
+
+    def _make_tuples(self,key):
+
+        stack = (Morph() & key).fetch1['stack']
+        (scan_z, scan_y, scan_x) = (Morph() & key).fetch1['scan_z', 'scan_y', 'scan_x']
+
 
 
 
@@ -667,12 +686,16 @@ class STA(dj.Computed):
     # Calculate the spike-triggered ensemble from noise recording
     -> Recording
     ---
-    sta     : longblob	# spike-triggered average
-    kernel  : longblob  # time kernel from center pixel and its neighbours
-    u       : longblob  # first temporal filter component
-    s       : longblob  # singular values
-    v       : longblob  # first spatial filter component
+    sta         : longblob	# spike-triggered average
+    idx_center  : blob      # (idx_x, idx_y) pixel index with highest s.d. over time
+    rf          : longblob  # array (stim_dim_x, stim_dim_y) with rf map at time point of kernel peak
+    tau         : int       # time lag at which rf map is extracted
+    kernel      : longblob  # time kernel from center pixel and its neighbours
+    u           : longblob  # first temporal filter component
+    s           : longblob  # singular values
+    v           : longblob  # first spatial filter component
     """
+
     @property
     def populated_from(self):
         return Recording() & dict(stim_type='bw_noise')
@@ -696,13 +719,11 @@ class STA(dj.Computed):
         stimInd = np.zeros(rec_len).astype(int)-1
 
         if len(triggertimes) != stim_length:
-            print('Something went wrong with the trigger detection!')
+            print('Something went wrong with the trigger detection\n # trigger: ', len(triggertimes))
 
-        else:
-
-            for n in range(len(triggertimes)-1):
-                stimInd[triggertimes[n]:triggertimes[n+1]-1] += int(n+1)
-            stimInd[triggertimes[len(triggertimes)-1]:triggertimes[len(triggertimes)-1]+(fs/stim_freq)-1] += int(len(triggertimes))
+        for n in range(len(triggertimes)-1):
+            stimInd[triggertimes[n]:triggertimes[n+1]-1] += int(n+1)
+        stimInd[triggertimes[len(triggertimes)-1]:triggertimes[len(triggertimes)-1]+(fs/stim_freq)-1] += int(len(triggertimes))
 
 
         deltat = 1000
@@ -725,6 +746,9 @@ class STA(dj.Computed):
         sd_map = np.std(sta, 0)
         idx_center = np.where(sd_map == np.max(sd_map))
         kernel = sta[:, idx_center[0], idx_center[1]]
+        frame = np.where(abs(kernel) == abs(kernel).max())[0][0]
+        rf = sta[frame, :, :]
+        tau = int(100 - 10 * int(frame))
 
         try:
 
@@ -733,28 +757,24 @@ class STA(dj.Computed):
         except Exception as e_svd:
 
             print(e_svd)
-            u = np.zeros([sta_raw.shape[0], sta_raw.shape[0]])
-            v = np.zeros([sta_raw.shape[1], sta_raw.shape[1]])
+            u = np.zeros([sta_raw.shape[0], sta_raw.shape[0]]) # first temporal filter component
+            v = np.zeros([sta_raw.shape[1], sta_raw.shape[1]]) # first spatial filter component
 
         if np.sign(np.mean(u[:, 0])) != np.sign(np.mean(kernel)):
             u = -1 * u
 
-        if np.mean(kernel) < 0:
-            idx_rf = np.where(kernel == min(kernel))[0][0]
-        else:
-            idx_rf = np.where(kernel == max(kernel))[0][0]
-
-        if np.sign(np.mean(v[0, :])) != np.sign(np.mean(sta_raw[idx_rf, :])):
+        if np.sign(np.mean(v[0, :])) != np.sign(np.mean(rf)):
             v = -1 * v
 
+        self.insert1(dict(key,sta=sta_raw, idx_center = np.array(idx_center),rf = rf, tau = tau, kernel = kernel, u = u[:,0], s = np.diag(s), v = v[0,:]))
 
-
-        self.insert1(dict(key,sta=sta_raw, kernel = kernel, u = u[:,0], s = np.diag(s), v = v[0,:]))
-
-    def plt_rf(self):
+    def plt_deltas(self):
 
         plt.rcParams.update(
-            {'figure.subplot.hspace': .2, 'figure.subplot.wspace': .3, 'figure.figsize': (15, 8), 'axes.titlesize': 16})
+            {'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .3,
+             'figure.figsize': (15, 8),
+             'axes.titlesize': 16})
 
         for key in self.project().fetch.as_dict:
 
@@ -803,37 +823,36 @@ class STA(dj.Computed):
 
                 plt.suptitle('STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
-    def plt_contour(self, tau, x1, x2, y1, y2):
+    def plt_contour(self):
 
         from matplotlib import ticker
 
         plt.rcParams.update({
-            'figure.figsize': (10, 8), 'figure.subplot.hspace': .2, 'figure.subplot.wspace': .2, 'axes.titlesize': 16,
+            'figure.figsize': (10, 8),
+            'figure.subplot.hspace': .2,
+            'figure.subplot.wspace': .2,
+            'axes.titlesize': 16,
             'axes.labelsize': 18,
-            'xtick.labelsize': 16, 'ytick.labelsize': 16, 'lines.linewidth': 4})
+            'xtick.labelsize': 16,
+            'ytick.labelsize': 16,
+            'lines.linewidth': 2})
 
         for key in self.project().fetch.as_dict:
-            sta = (self & key).fetch1['sta']
+            rf = (self & key).fetch1['rf']
+            tau = (self & key).fetch1['tau']
             fname = key['filename']
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
 
-            stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x', 'stim_dim_y']
-            sta_smooth = scimage.filters.gaussian_filter(sta.reshape(sta.shape[0], stimDim[0], stimDim[1]),
-                                                         [0.2, .7, .7])  # reshape and smooth with a gaussian filter
-
-            frame = int(10 - tau / 10)
 
             fig = plt.figure()
             plt.title('$\Delta$ t: ' + str(tau) + '\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
-            im = plt.imshow(sta_smooth[frame, :, :][x1:x2, y1:y2], interpolation='none',
-                            cmap=plt.cm.Greys_r, extent=(y1, y2, x2, x1), origin='upper')
-            cs = plt.contour(sta_smooth[frame, :, :][x1:x2, y1:y2],
-                             extent=(y1, y2, x2, x1), cmap=plt.cm.coolwarm, origin='upper', linewidth=4)
+            im = plt.imshow(rf, interpolation='none',cmap=plt.cm.Greys_r, origin='upper')
+            cs = plt.contour(rf,cmap=plt.cm.coolwarm, origin='upper', linewidth=4)
 
             cb = plt.colorbar(cs, extend='both', shrink=.8)
-            cbaxes = fig.add_axes([.15, .02, .6, .03])  # [left, bottom, width, height]
+            cbaxes = fig.add_axes([.15, .02, .6, .03])  # [left, bottom, width, height]rf
             cbi = plt.colorbar(im, orientation='horizontal', cax=cbaxes)
 
             tick_locator = ticker.MaxNLocator(nbins=6)
@@ -843,28 +862,26 @@ class STA(dj.Computed):
             cb.locator = tick_locator
             cb.update_ticks()
 
-    def plt_svd(self, tau, x1, x2, y1, y2):
+    def plt_svd(self):
 
 
 
         for key in self.project().fetch.as_dict:
 
-            sta = (self & key).fetch1['sta']
+            rf = (self & key).fetch1['rf']
+            tau = (self & key).fetch1['tau']
             kernel = (self & key).fetch1['kernel']
             u = (self & key).fetch1['u']
             v = (self & key).fetch1['v']
+
+            stimDim = (BWNoise & key).fetch1['stim_dim_x', 'stim_dim_y']
+
             fname = key['filename']
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
 
-            stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x', 'stim_dim_y']
-
-
-
             my_cmap = plt.cm.get_cmap('coolwarm')
             norm = matplotlib.colors.Normalize(min(kernel), max(kernel))
-            color_off = my_cmap(norm(min(kernel) + .02))
-            color_on = my_cmap(norm(max(kernel) - .02))
 
             plt.rcParams.update(
                 {'axes.titlesize': 16,
@@ -877,20 +894,12 @@ class STA(dj.Computed):
                  'figure.subplot.wspace': .2,
                  'ytick.major.pad': 10})
 
-            sta_smooth = scimage.filters.gaussian_filter(sta.reshape(sta.shape[0], stimDim[0], stimDim[1]),
-                                                         [0.2, .7, .7])  # reshape and smooth with a gaussian filter
-
-            frame = int(10 - tau / 10)
-
-
-
             fig = plt.figure()
             fig.suptitle(' STA at $\Delta$ t: ' + str(tau) + ' ms (upper panel) and SVD (lower panel) \n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16, y = 1.1)
 
             fig.add_subplot(2, 3, 1)
 
-            im = plt.imshow(sta_smooth[frame, :, :][x1:x2, y1:y2], interpolation='none',
-                            cmap=plt.cm.coolwarm, extent=(y1, y2, x2, x1), origin='upper')
+            im = plt.imshow(rf, interpolation='none',cmap=plt.cm.coolwarm, origin='upper')
             cbi = plt.colorbar(im)
             plt.xticks([])
             plt.yticks([])
@@ -913,8 +922,7 @@ class STA(dj.Computed):
             plt.ylabel('stimulus intensity', labelpad=20)
 
             fig.add_subplot(2, 3, 4)
-            im = plt.imshow(v.reshape(stimDim[0], stimDim[1])[x1:x2, y1:y2], interpolation='none',
-                            cmap=plt.cm.coolwarm, extent=(y1, y2, x2, x1), origin='upper')
+            im = plt.imshow(v.reshape(stimDim[0], stimDim[1]), interpolation='none',cmap=plt.cm.coolwarm, origin='upper')
             cbi = plt.colorbar(im)
             plt.xticks([])
             plt.yticks([])
