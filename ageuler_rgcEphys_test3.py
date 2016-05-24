@@ -271,7 +271,7 @@ class Overlay(dj.Computed):
 
             ax[0].set_xticklabels([])
             ax[0].set_yticklabels([])
-            ax[0].set_title('original', y=1.05)
+            ax[0].set_title('original', y=1.02)
 
             ax[1].imshow(rf_pad, cmap=plt.cm.coolwarm)
             ax[1].imshow(line_shift, cmap=plt.cm.gray, clim=clim)
@@ -281,10 +281,10 @@ class Overlay(dj.Computed):
 
             ax[1].set_xticklabels([])
             ax[1].set_yticklabels([])
-            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1)
+            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.02)
 
             plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),
-                         fontsize=16)
+                         fontsize=16,y = 1.1)
 
 
 
