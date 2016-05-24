@@ -186,14 +186,14 @@ class Overlay(dj.Computed):
 
         rf_pad = scimage.zoom(rf, factor, order=0)
 
-        params_m = self.fitgaussian(self,morph_pad)
-        params_rf = self.fitgaussian(self,np.abs(rf_pad))
+        params_m = self.fitgaussian(morph_pad)
+        params_rf = self.fitgaussian(np.abs(rf_pad))
 
         (shift_x, shift_y) = (params_rf - params_m)[1:3]
         morph_shift = np.lib.pad(morph, (
             (nx_pad + int(shift_x), nx_pad - int(shift_x)), (ny_pad + int(shift_y), ny_pad - int(shift_y))), 'constant',
                                  constant_values=0)
-        params_m_shift = self.fitgaussian(self,morph_shift)
+        params_m_shift = self.fitgaussian(morph_shift)
 
         a = morph_pad * np.indices(morph_pad.shape)
         com_m = np.sum(np.sum(a, axis=1), axis=1) / morph_pad.sum()
