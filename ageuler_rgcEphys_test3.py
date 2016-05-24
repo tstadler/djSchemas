@@ -687,7 +687,6 @@ class STA(dj.Computed):
     -> Recording
     ---
     sta         : longblob	# spike-triggered average
-    idx_center  : blob      # (idx_x, idx_y) pixel index with highest s.d. over time
     rf          : longblob  # array (stim_dim_x, stim_dim_y) with rf map at time point of kernel peak
     tau         : int       # time lag at which rf map is extracted
     kernel      : longblob  # time kernel from center pixel and its neighbours
@@ -766,7 +765,7 @@ class STA(dj.Computed):
         if np.sign(np.mean(v[0, :])) != np.sign(np.mean(rf)):
             v = -1 * v
 
-        self.insert1(dict(key,sta=sta_raw, idx_center = np.array(idx_center),rf = rf, tau = tau, kernel = kernel, u = u[:,0], s = np.diag(s), v = v[0,:]))
+        self.insert1(dict(key,sta=sta_raw, rf = rf, tau = tau, kernel = kernel, u = u[:,0], s = np.diag(s), v = v[0,:]))
 
     def plt_deltas(self):
 
