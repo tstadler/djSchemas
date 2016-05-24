@@ -71,11 +71,11 @@ class Morph(dj.Computed):
     # Reconstructed morphology of the cell as a line-stack
     -> Cell
     ---
-    stack   :longblob   # array (scan_z x scan_y x scan_x)
-    scan_z  :int        # number of consecutive frames in depth
-    scan_y  :int        # scan field y dim
-    scan_x  :int        # scan field x dim
-    zoom    :int        # zoom factor
+    stack   :longblob       # array (scan_z x scan_y x scan_x)
+    scan_z  :int            # number of consecutive frames in depth
+    scan_y  :int            # scan field y dim
+    scan_x  :int            # scan field x dim
+    zoom    :double         # zoom factor
     """
 
     @property
