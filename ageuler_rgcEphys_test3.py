@@ -8,6 +8,9 @@ import scipy.signal as scignal
 from IPython.display import display
 from matplotlib import ticker
 import matplotlib
+import tifffile as tf
+from sklearn.preprocessing import binarize
+from configparser import ConfigParser
 
 schema = dj.schema('ageuler_rgcEphys_test3',locals())
 
@@ -61,6 +64,47 @@ class Cell(dj.Manual):
     morphology  : boolean           # morphology was recorded or not
     type        : varchar(200)      # putative RGC type
     """
+
+@schema
+class Morph(dj.Computed):
+    definition="""
+    # Reconstructed morphology of the cell as a line-stack
+    -> Cell
+    ---
+    stack   :longblob   # array (scan_z x scan_y x scan_x)
+    scan_z  :int        # number of consecutive frames in depth
+    scan_y  :int        # scan field y dim
+    scan_x  :int        # scan field x dim
+    zoom    :int        # zoom factor
+    """
+
+    def populated_from(self):
+        return Cell() & dict(morphology = True)
+
+    def _make_tuples(self,key):
+
+        path = (Experiment() & key).fetch1['path']
+        exp_date = (Experiment() & key).fetch1['exp_date']
+        folder = (Cell() & key).fetch1['folder']
+        cell_id = (Cell() & key).fetch1['cell_id']
+
+        full_path = path + folder + 'linestack.tif'
+
+        stack = tf.imread(full_path)
+
+        # binarize
+
+        for z in range(stack.shape[0]):
+            binarize(stack[z, :, :], threshold=0, copy=False)
+
+        config = ConfigParser()
+        config.read(path + folder + 'C' + str(cell_id) + '_' + str(exp_date) + '.ini')
+        zoom = config.getfloat('morph', 'zoom')
+
+        self.insert1(dict(key, stack = stack, scan_z = stack.shape[0], scan_y = stack.shape[1], scan_x = stack.shape[2], zoom = zoom))
+
+
+
 
 @schema
 class Recording(dj.Manual):
