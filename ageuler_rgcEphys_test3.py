@@ -11,6 +11,7 @@ import matplotlib
 import tifffile as tf
 from sklearn.preprocessing import binarize
 from configparser import ConfigParser
+import scipy.optimize as scoptimize
 
 schema = dj.schema('ageuler_rgcEphys_test3',locals())
 
@@ -71,11 +72,14 @@ class Morph(dj.Computed):
     # Reconstructed morphology of the cell as a line-stack
     -> Cell
     ---
-    stack   :longblob       # array (scan_z x scan_x x scan_y)
-    scan_z  :int            # number of consecutive frames in depth
-    scan_y  :int            # scan field y dim
-    scan_x  :int            # scan field x dim
-    zoom    :double         # zoom factor
+    stack       :longblob       # array (scan_z x scan_x x scan_y)
+    scan_z      :int            # number of consecutive frames in depth
+    scan_y      :int            # scan field y dim
+    scan_x      :int            # scan field x dim
+    dx          :double         # pixel side length in um
+    dy          :double         # pixel side length in um
+    zoom        :double         # zoom factor
+    morph_size  :double     # side length of morph in um
     """
 
     @property
@@ -101,8 +105,15 @@ class Morph(dj.Computed):
         config = ConfigParser()
         config.read(path + folder + 'C' + str(cell_id) + '_' + str(exp_date) + '.ini')
         zoom = config.getfloat('morph', 'zoom')
+        morph_size = .64 / zoom * 110  # side length of stack image in um
 
-        self.insert1(dict(key, stack = stack, scan_z = stack.shape[0], scan_y = stack.shape[1], scan_x = stack.shape[2], zoom = zoom))
+        scan_x = stack.shape[1]
+        scan_y = stack.shape[2]
+
+        dx_morph = morph_size / scan_x  # morph pixel side length in um
+        dy_morph = morph_size / scan_y  # morph pixel side length in um
+
+        self.insert1(dict(key, stack = stack, scan_z = stack.shape[0], scan_y = scan_y, scan_x = scan_x,dx=dx_morph, dy=dy_morph, zoom = zoom, morph_size=morph_size))
 
     def plt_morph(self):
 
@@ -135,17 +146,145 @@ class Overlay(dj.Computed):
 
     -> Morph
     ---
-    stack_pad   :longblob   # morphology padded to rf map size
-    stack_shift :longblob   # morphology with com shifted onto rf center
-    rf_pad      :longblob   # receptive field map upsampled to morph resolution
+    stack_pad       :longblob   # morphology padded to rf map size
+    stack_shift     :longblob   # morphology with com shifted onto rf center
+    rf_pad          :longblob   # receptive field map upsampled to morph resolution
+    gauss_m         :longblob   # parameter set of a 2d gauss fit to the padded morph
+    gauss_m_shift   :longblob   # parameter set of a 2d gauss fit to the padded and shifted morph
+    gauss_rf        :longblob   # parameter set of a 2d gauss fit to the padded rf
+    com_m           :longblob   # center of mass of the padded morph
+    com_m_shift     :longblob   # center of mass of the shifted morph
+    com_rf          :longblob   # center of mass of the rf
+    shift_x         :int        # number of pixels shifted in x dim
+    shift_y         :int        # number of pixels shifted in y dim
 
     """
 
     def _make_tuples(self,key):
 
         stack = (Morph() & key).fetch1['stack']
-        (scan_z, scan_y, scan_x) = (Morph() & key).fetch1['scan_z', 'scan_y', 'scan_x']
+        (scan_z, scan_x, scan_y) = (Morph() & key).fetch1['scan_z', 'scan_x', 'scan_y']
+        zoom = (Morph() & key).fetch1['zoom']
+        morph_size = (Morph() & key).fetch1['morph_size']
+        (dx_morph, dy_morph) = (Morph() & key).fetch1['dx','dy']
+        (dx, dy) = (BWNoise() & key).fetch1['delx', 'dely']
 
+        rf = (STA() & key).fetch1['rf']
+
+
+        morph = np.mean(stack, 0)
+
+        dely = (rf.shape[1] * dy - morph_size) / 2  # missing at each side of stack to fill stimulus in um
+        delx = (rf.shape[0] * dx - morph_size) / 2
+
+        ny_pad = int(dely / dy_morph)  # number of pixels needed to fill the gap
+        nx_pad = int(delx / dx_morph)
+
+        morph_pad = np.lib.pad(morph, ((nx_pad, nx_pad), (ny_pad, ny_pad)), 'constant', constant_values=0)
+
+        factor = (morph_pad.shape[0] / rf.shape[0], morph_pad.shape[1] / rf.shape[1])
+
+        rf_pad = scimage.zoom(rf, factor, order=0)
+
+        params_m = self.fitgaussian(self,morph_pad)
+        params_rf = self.fitgaussian(self,np.abs(rf_pad))
+
+        (shift_x, shift_y) = (params_rf - params_m)[1:3]
+        morph_shift = np.lib.pad(morph, (
+            (nx_pad + int(shift_x), nx_pad - int(shift_x)), (ny_pad + int(shift_y), ny_pad - int(shift_y))), 'constant',
+                                 constant_values=0)
+        params_m_shift = self.fitgaussian(self,morph_shift)
+
+        a = morph_pad * np.indices(morph_pad.shape)
+        com_m = np.sum(np.sum(a, axis=1), axis=1) / morph_pad.sum()
+
+        a = morph_shift * np.indices(morph_shift.shape)
+        com_m_shift = np.sum(np.sum(a, axis=1), axis=1) / morph_shift.sum()
+
+        a = rf_pad * np.indices(rf_pad.shape)
+        com_rf = np.sum(np.sum(a, axis=1), axis=1) / rf_pad.sum()
+
+        self.insert1(dict(key, stack_pad = morph_pad,stack_shift = morph_shift, rf_pad = rf_pad,
+                          gauss_m = params_m, gauss_m_shift = params_m_shift,gauss_rf = params_rf,
+                          com_m = com_m,com_m_shift = com_m_shift,com_rf = com_rf, shift_x = int(shift_x), shift_y=int(shift_y)))
+
+    def gaussian(height, mu_x, mu_y, sd_x, sd_y):
+            """Returns a gaussian function with the given parameters"""
+            sd_x = float(sd_x)
+            sd_y = float(sd_y)
+            return lambda x, y: height * np.exp(-((x - mu_x) ** 2 / (sd_x ** 2) + (y - mu_y) ** 2 / (sd_y ** 2)) / 2)
+
+    def moments(data):
+        """Returns (height,mu_x, mu_y, sd_x, sd_y)
+        the gaussian parameters of a 2D distribution by calculating its
+        moments """
+        total = data.sum()
+        X, Y = np.indices(data.shape)
+        mu_x = (X * data).sum() / total
+        mu_y = (Y * data).sum() / total
+        col = data[:, int(mu_y)]
+        sd_x = np.sqrt(np.abs((np.arange(col.size) - mu_y) ** 2 * col / col.sum()).sum())
+        row = data[int(mu_x), :]
+        sd_y = np.sqrt(np.abs((np.arange(row.size) - mu_x) ** 2 * row / row.sum()).sum())
+        height = data.max()
+        return height, mu_x, mu_y, sd_x, sd_y
+
+    def fitgaussian(self,data):
+        """Returns (mu_x, mu_y, sd_x, sd_y)
+        the gaussian parameters of a 2D distribution found by a fit"""
+        params = self.moments(data)
+        errorfunction = lambda p: np.ravel(self.gaussian(*p)(*np.indices(data.shape)) -
+                                           data)
+        p, success = scoptimize.leastsq(errorfunction, params)
+        return p
+
+    def overlay(self):
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update({
+                'figure.figsize': (15, 8),
+                'figure.subplot.hspace': .2,
+                'figure.subplot.wspace': .2,
+                'axes.titlesize': 20,
+                'axes.labelsize': 18
+            })
+
+            morph_pad = (self & key).fetch1['stack_pad']
+            morph_shift = (self & key).fetch1['stack_shift']
+            rf_pad = (self & key).fetch1['rf_pad']
+            (shift_x, shift_y) = (self & key).fetch1['shift_x', 'shift_y']
+            (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
+            line_pad = np.ma.masked_where(morph_pad == 0, morph_pad)
+            line_shift = np.ma.masked_where(morph_pad == 0, morph_shift)
+
+            clim = (np.min(morph_pad), np.max(morph_pad) * .2)
+
+            fig, ax = plt.subplots(1, 2)
+            ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
+            ax[0].imshow(line_pad, cmap=plt.cm.gray, clim=clim)
+
+            ax[0].set_xticklabels([])
+            ax[0].set_yticklabels([])
+            ax[0].set_title('original', y=1.05)
+
+            ax[1].imshow(rf_pad, cmap=plt.cm.coolwarm)
+            ax[1].imshow(line_shift, cmap=plt.cm.gray, clim=clim)
+
+            dx_mu = shift_x * dx_morph
+            dy_mu = shift_y * dy_morph
+
+            ax[1].set_xticklabels([])
+            ax[1].set_yticklabels([])
+            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.05)
+
+            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),
+                         fontsize=16)
 
 
 
@@ -771,9 +910,12 @@ class STA(dj.Computed):
 
         plt.rcParams.update(
             {'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .3,
+             'figure.subplot.wspace': .2,
              'figure.figsize': (15, 8),
-             'axes.titlesize': 16})
+             'axes.titlesize': 16,
+             'axes.labelsize': 14
+             }
+        )
 
         for key in self.project().fetch.as_dict:
 
