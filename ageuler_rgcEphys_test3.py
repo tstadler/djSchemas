@@ -208,13 +208,13 @@ class Overlay(dj.Computed):
                           gauss_m = params_m, gauss_m_shift = params_m_shift,gauss_rf = params_rf,
                           com_m = com_m,com_m_shift = com_m_shift,com_rf = com_rf, shift_x = int(shift_x), shift_y=int(shift_y)))
 
-    def gaussian(height, mu_x, mu_y, sd_x, sd_y):
+    def gaussian(self,height, mu_x, mu_y, sd_x, sd_y):
             """Returns a gaussian function with the given parameters"""
             sd_x = float(sd_x)
             sd_y = float(sd_y)
             return lambda x, y: height * np.exp(-((x - mu_x) ** 2 / (sd_x ** 2) + (y - mu_y) ** 2 / (sd_y ** 2)) / 2)
 
-    def moments(data):
+    def moments(self,data):
         """Returns (height,mu_x, mu_y, sd_x, sd_y)
         the gaussian parameters of a 2D distribution by calculating its
         moments """
