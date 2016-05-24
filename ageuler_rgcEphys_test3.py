@@ -873,7 +873,7 @@ class STA(dj.Computed):
             u = (self & key).fetch1['u']
             v = (self & key).fetch1['v']
 
-            stimDim = (BWNoise() & key).fetch1['stim_dim_x', 'stim_dim_y']
+            stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x', 'stim_dim_y']
 
             fname = key['filename']
             exp_date = (Experiment() & key).fetch1['exp_date']
