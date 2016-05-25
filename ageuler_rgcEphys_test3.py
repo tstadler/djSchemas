@@ -118,11 +118,14 @@ class Morph(dj.Computed):
     def plt_morph(self):
 
         plt.rcParams.update(
-            {'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .3,
-             'figure.figsize': (10, 8),
+            {'figure.figsize': (12, 8),
              'axes.titlesize': 16,
-             'axes.labelsize': 14}
+             'axes.labelsize': 14,
+             'xtick.labelsize': 14,
+             'ytick.labelsize': 14,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .3
+             }
         )
 
         for key in self.project().fetch.as_dict:
@@ -242,13 +245,16 @@ class Overlay(dj.Computed):
 
         for key in self.project().fetch.as_dict:
 
-            plt.rcParams.update({
-                'figure.figsize': (15, 8),
-                'figure.subplot.hspace': .2,
-                'figure.subplot.wspace': .2,
-                'axes.titlesize': 16,
-                'axes.labelsize': 14
-            })
+            plt.rcParams.update(
+                {'figure.figsize': (12, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 14,
+                 'xtick.labelsize': 14,
+                 'ytick.labelsize': 14,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .3
+                 }
+            )
 
             morph_pad = (self & key).fetch1['stack_pad']
             morph_shift = (self & key).fetch1['stack_shift']
@@ -271,7 +277,7 @@ class Overlay(dj.Computed):
 
             ax[0].set_xticklabels([])
             ax[0].set_yticklabels([])
-            ax[0].set_title('original', y=1.02)
+            ax[0].set_title('original', y=1.05)
 
             ax[1].imshow(rf_pad, cmap=plt.cm.coolwarm)
             ax[1].imshow(line_shift, cmap=plt.cm.gray, clim=clim)
@@ -281,11 +287,70 @@ class Overlay(dj.Computed):
 
             ax[1].set_xticklabels([])
             ax[1].set_yticklabels([])
-            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.02)
+            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.05)
 
-            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),
-                         fontsize=16,y = 1.1)
+            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),y = 1.05)
 
+    def overlay_gauss(self):
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (12, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 14,
+                 'xtick.labelsize': 14,
+                 'ytick.labelsize': 14,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .3,
+                 'lines.linewidth':1
+                 }
+            )
+
+            morph_pad = (self & key).fetch1['stack_pad']
+            morph_shift = (self & key).fetch1['stack_shift']
+            rf_pad = (self & key).fetch1['rf_pad']
+            (shift_x, shift_y) = (self & key).fetch1['shift_x', 'shift_y']
+            params_m, params_m_shift, params_rf = (self & key).fetch1['gauss_m','gauss_m_shift','gauss_rf']
+
+            (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
+            line_pad = np.ma.masked_where(morph_pad == 0, morph_pad)
+            line_shift = np.ma.masked_where(morph_shift == 0, morph_shift)
+
+            fit_m_pad = self.helper.gaussian(*params_m)
+            fit_rf_pad = self.helper.gaussian(*params_rf)
+            fit_m_shift = self.helper.gaussian(*params_m_shift)
+
+            clim = (np.min(morph_pad), np.max(morph_pad) * .2)
+
+            fig, ax = plt.subplots(1, 2)
+            ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
+            ax[0].imshow(line_pad, cmap=plt.cm.gray, clim=clim)
+            ax[0].contour(fit_m_pad(*np.indices(morph_pad.shape)), cmap=plt.cm.Greens, linewidth=1)
+            ax[0].contour(fit_rf_pad(*np.indices(rf_pad.shape)), cmap=plt.cm.Purples, linewidth=1)
+
+            ax[0].set_xticklabels([])
+            ax[0].set_yticklabels([])
+            ax[0].set_title('original', y=1.05)
+
+            ax[1].imshow(rf_pad, cmap=plt.cm.coolwarm)
+            ax[1].imshow(line_shift, cmap=plt.cm.gray, clim=clim)
+            ax[1].contour(fit_m_shift(*np.indices(morph_pad.shape)), cmap=plt.cm.Greens, linewidth=1)
+            ax[1].contour(fit_rf_pad(*np.indices(rf_pad.shape)), cmap=plt.cm.Purples, linewidth=1)
+
+            dx_mu = shift_x * dx_morph
+            dy_mu = shift_y * dy_morph
+
+            ax[1].set_xticklabels([])
+            ax[1].set_yticklabels([])
+            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.05)
+
+            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), y=1.05)
 
 
 @schema
@@ -514,9 +579,15 @@ class Spikes(dj.Computed):
             """
 
         plt.rcParams.update(
-            {'figure.figsize': (15, 6), 'axes.titlesize': 20, 'axes.labelsize': 18, 'xtick.labelsize': 16,
-             'ytick.labelsize': 16})
-
+            {'figure.figsize': (12, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 14,
+             'xtick.labelsize': 14,
+             'ytick.labelsize': 14,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .3
+             }
+        )
         fig, ax = plt.subplots()
 
         x = np.linspace(start, end, (end - start) * fs)
@@ -560,8 +631,15 @@ class Spikes(dj.Computed):
                 voltage_trace = np.append(voltage_trace, dset)
 
             plt.rcParams.update(
-                {'figure.figsize': (15, 6), 'axes.titlesize': 20, 'axes.labelsize': 18, 'xtick.labelsize': 16,
-                 'ytick.labelsize': 16})
+                {'figure.figsize': (12, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 14,
+                 'xtick.labelsize': 14,
+                 'ytick.labelsize': 14,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .3
+                 }
+            )
 
             x = np.linspace(start, end, (end - start) * fs)
 
@@ -581,6 +659,17 @@ class Spikes(dj.Computed):
         end = int(input('to (in s): '))
 
         for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (12, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 14,
+                 'xtick.labelsize': 14,
+                 'ytick.labelsize': 14,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .3
+                 }
+            )
 
             fname = key['filename']
 
@@ -617,10 +706,6 @@ class Spikes(dj.Computed):
             voltage_trace = scignal.filtfilt(b, a, voltage_trace)
 
             # plot
-
-            plt.rcParams.update(
-                {'figure.figsize': (15, 6), 'axes.titlesize': 20, 'axes.labelsize': 18, 'xtick.labelsize': 16,
-                 'ytick.labelsize': 16})
 
             fig, ax = plt.subplots()
             plt.suptitle(str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
@@ -909,11 +994,13 @@ class STA(dj.Computed):
     def plt_deltas(self):
 
         plt.rcParams.update(
-            {'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .2,
-             'figure.figsize': (15, 8),
+            {'figure.figsize': (12, 8),
              'axes.titlesize': 16,
-             'axes.labelsize': 14
+             'axes.labelsize': 14,
+             'xtick.labelsize': 14,
+             'ytick.labelsize': 14,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
              }
         )
 
@@ -968,15 +1055,17 @@ class STA(dj.Computed):
 
         from matplotlib import ticker
 
-        plt.rcParams.update({
-            'figure.figsize': (10, 8),
-            'figure.subplot.hspace': .2,
-            'figure.subplot.wspace': .2,
-            'axes.titlesize': 16,
-            'axes.labelsize': 18,
-            'xtick.labelsize': 16,
-            'ytick.labelsize': 16,
-            'lines.linewidth': 2})
+        plt.rcParams.update(
+            {'figure.figsize': (12, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 14,
+             'xtick.labelsize': 14,
+             'ytick.labelsize': 14,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .3,
+             'lines.linewidth': 2
+             }
+        )
 
         for key in self.project().fetch.as_dict:
             rf = (self & key).fetch1['rf']
@@ -1009,6 +1098,19 @@ class STA(dj.Computed):
 
         for key in self.project().fetch.as_dict:
 
+            plt.rcParams.update(
+                {'axes.titlesize': 16,
+                 'axes.labelsize': 14,
+                 'xtick.labelsize': 14,
+                 'ytick.labelsize': 14,
+                 'figure.figsize': (15, 8),
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .2,
+                 'ytick.major.pad': 10
+                 }
+            )
+
+
             rf = (self & key).fetch1['rf']
             tau = (self & key).fetch1['tau']
             kernel = (self & key).fetch1['kernel']
@@ -1020,20 +1122,6 @@ class STA(dj.Computed):
             fname = key['filename']
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
-
-            my_cmap = plt.cm.get_cmap('coolwarm')
-            norm = matplotlib.colors.Normalize(min(kernel), max(kernel))
-
-            plt.rcParams.update(
-                {'axes.titlesize': 16,
-                 'axes.labelsize': 18,
-                 'xtick.labelsize': 16,
-                 'ytick.labelsize': 16,
-                 'lines.linewidth': 4,
-                 'figure.figsize': (15, 8),
-                 'figure.subplot.hspace': .2,
-                 'figure.subplot.wspace': .2,
-                 'ytick.major.pad': 10})
 
             fig = plt.figure()
             fig.suptitle(' STA at $\Delta$ t: ' + str(tau) + ' ms (upper panel) and SVD (lower panel) \n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16, y = 1.1)
@@ -1052,9 +1140,9 @@ class STA(dj.Computed):
             deltat = 1000  # in ms
             t = np.linspace(100, -deltat, len(kernel))
             if np.sign(np.mean(kernel)) == -1:
-                plt.plot(t, kernel, color='b')
+                plt.plot(t, kernel, color='b',linewidth=4)
             else:
-                plt.plot(t, kernel, color='r')
+                plt.plot(t, kernel, color='r',linewidth=4)
 
             plt.locator_params(axis='y', nbins=4)
             ax = fig.gca()
@@ -1076,9 +1164,9 @@ class STA(dj.Computed):
             fig.add_subplot(2, 2, 4)
 
             if np.sign(np.mean(u)) == -1:
-                plt.plot(t, u, color='b')
+                plt.plot(t, u, color='b',linewidth=4)
             else:
-                plt.plot(t, u, color='r')
+                plt.plot(t, u, color='r',linewidth=4)
 
             plt.locator_params(axis='y', nbins=4)
             ax = fig.gca()
@@ -1175,8 +1263,16 @@ class Chirp(dj.Computed):
     def plt_chirp(self):
 
         # Plotting parameter
-        plt.rcParams.update({'xtick.labelsize': 16, 'ytick.labelsize': 16, 'axes.labelsize': 16, 'axes.titlesize': 20,
-                             'figure.figsize': (12, 8), 'lines.linewidth': 2})
+        plt.rcParams.update(
+            {'axes.titlesize': 16,
+             'axes.labelsize': 14,
+             'xtick.labelsize': 14,
+             'ytick.labelsize': 14,
+             'figure.figsize': (12, 8),
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2,
+             'lines.linewidth':2,
+             'ytick.major.pad': 10})
 
         # define stimulus
 
@@ -1387,8 +1483,16 @@ class DS(dj.Computed):
 
     def plt_ds(self):
 
-        plt.rcParams.update({'xtick.labelsize': 16, 'ytick.labelsize': 16, 'axes.labelsize': 16, 'axes.titlesize': 20,
-                             'figure.figsize': (10, 8)})
+        plt.rcParams.update(
+            {'axes.titlesize': 16,
+             'axes.labelsize': 14,
+             'xtick.labelsize': 14,
+             'ytick.labelsize': 14,
+             'figure.figsize': (12, 8),
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2,
+             'lines.linewidth': 2,
+             'ytick.major.pad': 10})
 
         for key in self.project().fetch.as_dict:
             hist = (self & key).fetch1['hist']
@@ -1425,10 +1529,20 @@ class DS(dj.Computed):
 
     def plt_ds_traces(self):
 
-        plt.rcParams.update({'xtick.labelsize': 16, 'ytick.labelsize': 16, 'axes.labelsize': 16, 'axes.titlesize': 20,
-                             'figure.figsize': (15, 8)})
-
         for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'axes.titlesize': 16,
+                 'axes.labelsize': 14,
+                 'xtick.labelsize': 14,
+                 'ytick.labelsize': 14,
+                 'figure.figsize': (20, 8),
+                 'figure.subplot.hspace': .1,
+                 'figure.subplot.wspace': .2,
+                 'lines.linewidth': 2,
+                 'ytick.major.pad': 10
+                 }
+            )
 
             fname = (Recording() & key).fetch1['filename']
             ch_trigger = (Recording() & key).fetch1['ch_trigger']
@@ -1479,8 +1593,6 @@ class DS(dj.Computed):
             for i in range(len(triggertimes)):
                 v_trace_trial.append(np.array(voltage_trace[triggertimes[i]:triggertimes[i] + t_on + t_off]))
                 stim_trial.append(np.array(stim[triggertimes[i]:triggertimes[i] + t_on + t_off]))
-
-            plt.rcParams.update({'figure.subplot.hspace': .1, 'figure.figsize': (20, 8)})
 
             N = len(v_trace_trial)
             fig1, axarr = plt.subplots(int(N / nconditions) + 1, nconditions, sharex=True,
@@ -1585,6 +1697,19 @@ class OnOff(dj.Computed):
 
         for key in self.project().fetch.as_dict:
 
+            plt.rcParams.update(
+                {'axes.titlesize': 16,
+                 'axes.labelsize': 14,
+                 'xtick.labelsize': 14,
+                 'ytick.labelsize': 14,
+                 'figure.figsize': (15, 8),
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .2,
+                 'lines.linewidth': 2,
+                 'ytick.major.pad': 10
+                 }
+            )
+
             fname = (Recording() & key).fetch1['filename']
             ch_trigger = (Recording() & key).fetch1['ch_trigger']
             ch_voltage = (Recording() & key).fetch1['ch_voltage']
@@ -1612,10 +1737,6 @@ class OnOff(dj.Computed):
             offset_stim = .027  # in s
             triggertimes = triggertimes + offset_stim * fs
 
-            plt.rcParams.update(
-                {'xtick.labelsize': 16, 'ytick.labelsize': 16, 'axes.labelsize': 16, 'axes.titlesize': 20,
-                 'figure.figsize': (10, 8), 'lines.linewidth': 2, 'figure.subplot.hspace': .2,
-                 'figure.subplot.hspace': .2})
 
             t_off = .5 * fs  # in s * fs
             t_on = .5 * fs  # in s
@@ -1633,10 +1754,6 @@ class OnOff(dj.Computed):
 
             scale = np.max(voltage_trace) - np.min(voltage_trace)
             offset = np.min(voltage_trace)
-
-            plt.rcParams.update(
-                {'axes.titlesize': 20, 'axes.labelsize': 18, 'xtick.labelsize': 16, 'ytick.labelsize': 16,
-                 'figure.figsize': (15, 8), 'figure.subplot.hspace': .1})
 
             fig1, axarr = plt.subplots(4, int(np.ceil(len(triggertimes) / 2)), sharex=True, sharey=True)
             plt.suptitle('Spot response\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=18)
