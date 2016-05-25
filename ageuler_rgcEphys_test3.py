@@ -587,7 +587,7 @@ class Spikes(dj.Computed):
              'xtick.labelsize': 16,
              'ytick.labelsize': 16,
              'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .3,
+             'figure.subplot.wspace': .2,
              'lines.linewidth': 2
              }
         )
@@ -620,7 +620,7 @@ class Spikes(dj.Computed):
                  'xtick.labelsize': 16,
                  'ytick.labelsize': 16,
                  'figure.subplot.hspace': .2,
-                 'figure.subplot.wspace': .3,
+                 'figure.subplot.wspace': .2,
                  'lines.linewidth':2
                  }
             )
@@ -646,22 +646,11 @@ class Spikes(dj.Computed):
                 dset = ch_sec_tmp['data'][:]  # get array
                 voltage_trace = np.append(voltage_trace, dset)
 
-            plt.rcParams.update(
-                {'figure.figsize': (12, 8),
-                 'axes.titlesize': 16,
-                 'axes.labelsize': 16,
-                 'xtick.labelsize': 16,
-                 'ytick.labelsize': 16,
-                 'figure.subplot.hspace': .2,
-                 'figure.subplot.wspace': .3
-                 }
-            )
-
             x = np.linspace(start, end, (end - start) * fs)
 
             fig, ax = plt.subplots()
 
-            plt.suptitle(str(exp_date) + ': ' + eye + ': ' + fname)
+            plt.suptitle(str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             ax.plot(x, voltage_trace[start * fs:end * fs], linewidth=2)
             ax.set_ylabel('Voltage [mV]', labelpad=20)
@@ -683,7 +672,7 @@ class Spikes(dj.Computed):
                  'xtick.labelsize': 16,
                  'ytick.labelsize': 16,
                  'figure.subplot.hspace': .2,
-                 'figure.subplot.wspace': .3,
+                 'figure.subplot.wspace': .2,
                  'lines.linewidth': 2
                  }
             )
