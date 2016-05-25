@@ -1018,47 +1018,62 @@ class Overlay(dj.Computed):
         rf_pad = scimage.zoom(rf, factor, order=0)
 
         try:
-            params_m = self.fitgaussian(morph_pad)
-            if any(params_m < 0):
-                raise ValueError
+            try:
+                params_m = self.fitgaussian(morph_pad)
+            except RuntimeWarning as e1:
+                print(e1)
+                params_m = np.array(
+                    [1, morph_pad.shape[0] / 2, morph_pad.shape[1] / 2, morph_pad.shape[0], morph_pad.shape[1]])
+            try:
+                params_rf = self.fitgaussian(np.abs(rf_pad))
+            except RuntimeWarning as e2:
+                print(e2)
+                params_rf = np.array([1, rf_pad.shape[0] / 2, rf_pad.shape[1] / 2, rf_pad.shape[0], rf_pad.shape[1]])
+            (shift_x, shift_y) = (params_rf - params_m)[1:3]
+            morph_shift = np.lib.pad(morph, (
+                (nx_pad + int(shift_x), nx_pad - int(shift_x)), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
+                                     'constant',
+                                     constant_values=0)
+            try:
+                params_m_shift = self.fitgaussian(morph_shift)
+            except RuntimeWarning as e4:
+                print(e4)
+                params_m_shift = np.array(
+                    [1, morph_pad.shape[0] / 2, morph_pad.shape[1] / 2, morph_pad.shape[0], morph_pad.shape[1]])
 
-        except Exception as e1:
-            print('Gaussian fit failed for rf')
-            print(e1)
-            params_m = np.array([1, morph_pad.shape[0] / 2, morph_pad.shape[1] / 2, morph_pad.shape[0], morph_pad.shape[1]])
-        try:
-            params_rf = self.fitgaussian(np.abs(rf_pad))
+            a = morph_pad * np.indices(morph_pad.shape)
+            com_m = np.sum(np.sum(a, axis=1), axis=1) / morph_pad.sum()
 
-            if any(params_rf < 0):
-                raise ValueError
+            a = morph_shift * np.indices(morph_shift.shape)
+            com_m_shift = np.sum(np.sum(a, axis=1), axis=1) / morph_shift.sum()
 
-        except Exception as e1:
-            print('Gaussian fit failed for rf')
-            print(e1)
-            params_rf = np.array([1, rf_pad.shape[0] / 2, rf_pad.shape[1] / 2, rf_pad.shape[0], rf_pad.shape[1]])
+            a = rf_pad * np.indices(rf_pad.shape)
+            com_rf = np.sum(np.sum(a, axis=1), axis=1) / rf_pad.sum()
 
-        (shift_x, shift_y) = (params_rf - params_m)[1:3]
-        morph_shift = np.lib.pad(morph, (
-            (nx_pad + int(shift_x), nx_pad - int(shift_x)), (ny_pad + int(shift_y), ny_pad - int(shift_y))), 'constant',
-                                 constant_values=0)
-        try:
-            params_m_shift = self.fitgaussian(morph_shift)
-            if any(params_m_shift < 0):
-                raise ValueError
+        except Exception as e3:
+            print(e3)
+            print('Alignment by com')
 
-        except Exception as e1:
-            print('Gaussian fit failed for rf')
-            print(e1)
-            params_m_shift = np.array([1, morph_pad.shape[0] / 2, morph_pad.shape[1] / 2, morph_pad.shape[0], morph_pad.shape[1]])
+            a = morph_pad * np.indices(morph_pad.shape)
+            com_m = np.sum(np.sum(a, axis=1), axis=1) / morph_pad.sum()
 
-        a = morph_pad * np.indices(morph_pad.shape)
-        com_m = np.sum(np.sum(a, axis=1), axis=1) / morph_pad.sum()
+            a = np.abs(rf_pad) * np.indices(rf_pad.shape)
+            com_rf = np.sum(np.sum(a, axis=1), axis=1) / np.abs(rf_pad).sum()
 
-        a = morph_shift * np.indices(morph_shift.shape)
-        com_m_shift = np.sum(np.sum(a, axis=1), axis=1) / morph_shift.sum()
+            (shift_x, shift_y) = (com_rf - com_m)
+            morph_shift = np.lib.pad(morph, (
+                (nx_pad + int(shift_x), nx_pad - int(shift_x)), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
+                                     'constant',
+                                     constant_values=0)
+            try:
+                params_m_shift = self.fitgaussian(morph_shift)
+            except RuntimeWarning as e4:
+                print(e4)
+                params_m_shift = np.array(
+                    [1, morph_pad.shape[0] / 2, morph_pad.shape[1] / 2, morph_pad.shape[0], morph_pad.shape[1]])
 
-        a = rf_pad * np.indices(rf_pad.shape)
-        com_rf = np.sum(np.sum(a, axis=1), axis=1) / rf_pad.sum()
+            a = morph_shift * np.indices(morph_shift.shape)
+            com_m_shift = np.sum(np.sum(a, axis=1), axis=1) / morph_shift.sum()
 
         self.insert1(dict(key, stack_pad = morph_pad,stack_shift = morph_shift, rf_pad = rf_pad,
                           gauss_m = params_m, gauss_m_shift = params_m_shift,gauss_rf = params_rf,
