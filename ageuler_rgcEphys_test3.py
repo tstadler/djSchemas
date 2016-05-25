@@ -97,10 +97,11 @@ class Morph(dj.Computed):
 
         stack = tf.imread(full_path)
 
-        # binarize
+        # binarize and invert x-axis for proper orientation
 
+        stack_bin = np.zeros(stack.shape)
         for z in range(stack.shape[0]):
-            binarize(stack[z, :, :], threshold=0, copy=False)
+            stack_bin[z, :, :] = binarize(stack[z, ::-1, :], threshold=0, copy=True)
 
         config = ConfigParser()
         config.read(path + folder + 'C' + str(cell_id) + '_' + str(exp_date) + '.ini')
@@ -113,7 +114,7 @@ class Morph(dj.Computed):
         dx_morph = morph_size / scan_x  # morph pixel side length in um
         dy_morph = morph_size / scan_y  # morph pixel side length in um
 
-        self.insert1(dict(key, stack = stack, scan_z = stack.shape[0], scan_y = scan_y, scan_x = scan_x,dx=dx_morph, dy=dy_morph, zoom = zoom, morph_size=morph_size))
+        self.insert1(dict(key, stack = stack_bin, scan_z = stack.shape[0], scan_y = scan_y, scan_x = scan_x,dx=dx_morph, dy=dy_morph, zoom = zoom, morph_size=morph_size))
 
     def plt_morph(self):
 
