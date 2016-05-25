@@ -121,9 +121,9 @@ class Morph(dj.Computed):
         plt.rcParams.update(
             {'figure.figsize': (12, 8),
              'axes.titlesize': 16,
-             'axes.labelsize': 14,
-             'xtick.labelsize': 14,
-             'ytick.labelsize': 14,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
              'figure.subplot.hspace': .2,
              'figure.subplot.wspace': .3
              }
@@ -149,6 +149,7 @@ class Overlay(dj.Computed):
     # Overlay of linestack and receptive field map
 
     -> Morph
+    -> STA
     ---
     stack_pad       :longblob   # morphology padded to rf map size
     stack_shift     :longblob   # morphology with com shifted onto rf center
@@ -249,9 +250,9 @@ class Overlay(dj.Computed):
             plt.rcParams.update(
                 {'figure.figsize': (12, 8),
                  'axes.titlesize': 16,
-                 'axes.labelsize': 14,
-                 'xtick.labelsize': 14,
-                 'ytick.labelsize': 14,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
                  'figure.subplot.hspace': .2,
                  'figure.subplot.wspace': .3
                  }
@@ -270,7 +271,7 @@ class Overlay(dj.Computed):
             line_pad = np.ma.masked_where(morph_pad == 0, morph_pad)
             line_shift = np.ma.masked_where(morph_shift == 0, morph_shift)
 
-            clim = (np.min(morph_pad), np.max(morph_pad) * .2)
+            clim = (0,.01)
 
             fig, ax = plt.subplots(1, 2)
             ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
@@ -290,7 +291,7 @@ class Overlay(dj.Computed):
             ax[1].set_yticklabels([])
             ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.05)
 
-            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),y = 1.05)
+            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),y = 1.05, fontsize=16)
 
     def overlay_gauss(self):
 
@@ -299,9 +300,9 @@ class Overlay(dj.Computed):
             plt.rcParams.update(
                 {'figure.figsize': (12, 8),
                  'axes.titlesize': 16,
-                 'axes.labelsize': 14,
-                 'xtick.labelsize': 14,
-                 'ytick.labelsize': 14,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
                  'figure.subplot.hspace': .2,
                  'figure.subplot.wspace': .3,
                  'lines.linewidth':1
@@ -327,7 +328,7 @@ class Overlay(dj.Computed):
             fit_rf_pad = self.gaussian(*params_rf)
             fit_m_shift = self.gaussian(*params_m_shift)
 
-            clim = (np.min(morph_pad), np.max(morph_pad) * .2)
+            clim = (0,.01)
 
             fig, ax = plt.subplots(1, 2)
             ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
@@ -351,7 +352,7 @@ class Overlay(dj.Computed):
             ax[1].set_yticklabels([])
             ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.05)
 
-            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), y=1.05)
+            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), y=1.05,fontsize=16)
 
 
 @schema
@@ -580,15 +581,17 @@ class Spikes(dj.Computed):
             """
 
         plt.rcParams.update(
-            {'figure.figsize': (12, 8),
+            {'figure.figsize': (14, 7),
              'axes.titlesize': 16,
-             'axes.labelsize': 14,
-             'xtick.labelsize': 14,
-             'ytick.labelsize': 14,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
              'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .3
+             'figure.subplot.wspace': .3,
+             'lines.linewidth': 2
              }
         )
+
         fig, ax = plt.subplots()
 
         x = np.linspace(start, end, (end - start) * fs)
@@ -609,6 +612,18 @@ class Spikes(dj.Computed):
         end = int(input('to (in s): '))
 
         for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (14, 7),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .3,
+                 'lines.linewidth':2
+                 }
+            )
 
             fname = key['filename']
 
@@ -634,9 +649,9 @@ class Spikes(dj.Computed):
             plt.rcParams.update(
                 {'figure.figsize': (12, 8),
                  'axes.titlesize': 16,
-                 'axes.labelsize': 14,
-                 'xtick.labelsize': 14,
-                 'ytick.labelsize': 14,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
                  'figure.subplot.hspace': .2,
                  'figure.subplot.wspace': .3
                  }
@@ -646,7 +661,7 @@ class Spikes(dj.Computed):
 
             fig, ax = plt.subplots()
 
-            plt.suptitle(str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
+            plt.suptitle(str(exp_date) + ': ' + eye + ': ' + fname)
 
             ax.plot(x, voltage_trace[start * fs:end * fs], linewidth=2)
             ax.set_ylabel('Voltage [mV]', labelpad=20)
@@ -662,13 +677,14 @@ class Spikes(dj.Computed):
         for key in self.project().fetch.as_dict:
 
             plt.rcParams.update(
-                {'figure.figsize': (12, 8),
+                {'figure.figsize': (14, 7),
                  'axes.titlesize': 16,
-                 'axes.labelsize': 14,
-                 'xtick.labelsize': 14,
-                 'ytick.labelsize': 14,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
                  'figure.subplot.hspace': .2,
-                 'figure.subplot.wspace': .3
+                 'figure.subplot.wspace': .3,
+                 'lines.linewidth': 2
                  }
             )
 
@@ -995,11 +1011,11 @@ class STA(dj.Computed):
     def plt_deltas(self):
 
         plt.rcParams.update(
-            {'figure.figsize': (12, 8),
+            {'figure.figsize': (15, 8),
              'axes.titlesize': 16,
-             'axes.labelsize': 14,
-             'xtick.labelsize': 14,
-             'ytick.labelsize': 14,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
              'figure.subplot.hspace': .2,
              'figure.subplot.wspace': .2
              }
@@ -1059,9 +1075,9 @@ class STA(dj.Computed):
         plt.rcParams.update(
             {'figure.figsize': (12, 8),
              'axes.titlesize': 16,
-             'axes.labelsize': 14,
-             'xtick.labelsize': 14,
-             'ytick.labelsize': 14,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
              'figure.subplot.hspace': .2,
              'figure.subplot.wspace': .3,
              'lines.linewidth': 2
@@ -1101,12 +1117,12 @@ class STA(dj.Computed):
 
             plt.rcParams.update(
                 {'axes.titlesize': 16,
-                 'axes.labelsize': 14,
-                 'xtick.labelsize': 14,
-                 'ytick.labelsize': 14,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
                  'figure.figsize': (15, 8),
                  'figure.subplot.hspace': .2,
-                 'figure.subplot.wspace': .2,
+                 'figure.subplot.wspace': .1,
                  'ytick.major.pad': 10
                  }
             )
@@ -1266,9 +1282,9 @@ class Chirp(dj.Computed):
         # Plotting parameter
         plt.rcParams.update(
             {'axes.titlesize': 16,
-             'axes.labelsize': 14,
-             'xtick.labelsize': 14,
-             'ytick.labelsize': 14,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
              'figure.figsize': (12, 8),
              'figure.subplot.hspace': .2,
              'figure.subplot.wspace': .2,
@@ -1486,10 +1502,10 @@ class DS(dj.Computed):
 
         plt.rcParams.update(
             {'axes.titlesize': 16,
-             'axes.labelsize': 14,
-             'xtick.labelsize': 14,
-             'ytick.labelsize': 14,
-             'figure.figsize': (12, 8),
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.figsize': (10, 8),
              'figure.subplot.hspace': .2,
              'figure.subplot.wspace': .2,
              'lines.linewidth': 2,
@@ -1534,9 +1550,9 @@ class DS(dj.Computed):
 
             plt.rcParams.update(
                 {'axes.titlesize': 16,
-                 'axes.labelsize': 14,
-                 'xtick.labelsize': 14,
-                 'ytick.labelsize': 14,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
                  'figure.figsize': (20, 8),
                  'figure.subplot.hspace': .1,
                  'figure.subplot.wspace': .2,
@@ -1700,9 +1716,9 @@ class OnOff(dj.Computed):
 
             plt.rcParams.update(
                 {'axes.titlesize': 16,
-                 'axes.labelsize': 14,
-                 'xtick.labelsize': 14,
-                 'ytick.labelsize': 14,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
                  'figure.figsize': (15, 8),
                  'figure.subplot.hspace': .2,
                  'figure.subplot.wspace': .2,
