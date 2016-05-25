@@ -322,9 +322,9 @@ class Overlay(dj.Computed):
             line_pad = np.ma.masked_where(morph_pad == 0, morph_pad)
             line_shift = np.ma.masked_where(morph_shift == 0, morph_shift)
 
-            fit_m_pad = self.helper.gaussian(*params_m)
-            fit_rf_pad = self.helper.gaussian(*params_rf)
-            fit_m_shift = self.helper.gaussian(*params_m_shift)
+            fit_m_pad = self.gaussian(*params_m)
+            fit_rf_pad = self.gaussian(*params_rf)
+            fit_m_shift = self.gaussian(*params_m_shift)
 
             clim = (np.min(morph_pad), np.max(morph_pad) * .2)
 
