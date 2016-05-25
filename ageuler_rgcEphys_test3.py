@@ -1017,14 +1017,39 @@ class Overlay(dj.Computed):
 
         rf_pad = scimage.zoom(rf, factor, order=0)
 
-        params_m = self.fitgaussian(morph_pad)
-        params_rf = self.fitgaussian(np.abs(rf_pad))
+        try:
+            params_m = self.fitgaussian(morph_pad)
+            if any(params_m < 0):
+                raise ValueError
+
+        except Exception as e1:
+            print('Gaussian fit failed for rf')
+            print(e1)
+            params_m = np.array([1, morph_pad.shape[0] / 2, morph_pad.shape[1] / 2, morph_pad.shape[0], morph_pad.shape[1]])
+        try:
+            params_rf = self.fitgaussian(np.abs(rf_pad))
+
+            if any(params_rf < 0):
+                raise ValueError
+
+        except Exception as e1:
+            print('Gaussian fit failed for rf')
+            print(e1)
+            params_rf = np.array([1, rf_pad.shape[0] / 2, rf_pad.shape[1] / 2, rf_pad.shape[0], rf_pad.shape[1]])
 
         (shift_x, shift_y) = (params_rf - params_m)[1:3]
         morph_shift = np.lib.pad(morph, (
             (nx_pad + int(shift_x), nx_pad - int(shift_x)), (ny_pad + int(shift_y), ny_pad - int(shift_y))), 'constant',
                                  constant_values=0)
-        params_m_shift = self.fitgaussian(morph_shift)
+        try:
+            params_m_shift = self.fitgaussian(morph_shift)
+            if any(params_m_shift < 0):
+                raise ValueError
+
+        except Exception as e1:
+            print('Gaussian fit failed for rf')
+            print(e1)
+            params_m_shift = np.array([1, morph_pad.shape[0] / 2, morph_pad.shape[1] / 2, morph_pad.shape[0], morph_pad.shape[1]])
 
         a = morph_pad * np.indices(morph_pad.shape)
         com_m = np.sum(np.sum(a, axis=1), axis=1) / morph_pad.sum()
