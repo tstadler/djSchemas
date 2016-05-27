@@ -988,8 +988,7 @@ class STA(dj.Computed):
             plt.xlabel('time [ms]', labelpad=10)
             plt.ylabel('stimulus intensity', labelpad=20)
 
-            plt.tight_layout()
-            plt.subplots_adjust(top=.9)
+            plt.subplots_adjust(top=.95)
 
             return fig
 
