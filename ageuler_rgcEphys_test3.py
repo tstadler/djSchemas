@@ -143,7 +143,7 @@ class Morph(dj.Computed):
             plt.tight_layout()
             plt.imshow(morph, cmap=plt.cm.gray_r, clim=(0, .01))
             plt.suptitle('Mean over binarized stack in z-axis\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
-            plt.subplots_adjust(top=.9)
+            plt.subplots_adjust(top=.8)
 
             return fig
 
@@ -1159,7 +1159,7 @@ class Overlay(dj.Computed):
 
             ax[0].set_xticklabels([])
             ax[0].set_yticklabels([])
-            ax[0].set_title('original', y=1.05)
+            ax[0].set_title('original')
 
             ax[1].imshow(rf_pad, cmap=plt.cm.coolwarm)
             ax[1].imshow(line_shift, cmap=plt.cm.gray, clim=clim)
@@ -1169,9 +1169,12 @@ class Overlay(dj.Computed):
 
             ax[1].set_xticklabels([])
             ax[1].set_yticklabels([])
-            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.05)
+            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu),)
 
-            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),y = 1.05, fontsize=16)
+            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),fontsize=16)
+
+            plt.tight_layout()
+            plt.subplots_adjust(top=.8)
 
             return fig
 
