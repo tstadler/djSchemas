@@ -1149,7 +1149,7 @@ class Overlay(dj.Computed):
             line_pad = np.ma.masked_where(morph_pad == 0, morph_pad)
             line_shift = np.ma.masked_where(morph_shift == 0, morph_shift)
 
-            clim = (0,.01)
+            clim = (0,.1)
 
             fig, ax = plt.subplots(1, 2)
             ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
@@ -1208,7 +1208,7 @@ class Overlay(dj.Computed):
             fit_rf_pad = self.gaussian(*params_rf)
             fit_m_shift = self.gaussian(*params_m_shift)
 
-            clim = (0,.01)
+            clim = (0,1)
 
             fig, ax = plt.subplots(1, 2)
             ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
