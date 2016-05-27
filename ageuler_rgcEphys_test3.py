@@ -143,6 +143,8 @@ class Morph(dj.Computed):
             plt.tight_layout()
             plt.imshow(morph, cmap=plt.cm.gray_r, clim=(0, .01))
             plt.suptitle('Mean over binarized stack in z-axis\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+
+            plt.tight_layout()
             plt.subplots_adjust(top=.8)
 
             return fig
@@ -450,6 +452,9 @@ class Spikes(dj.Computed):
             ax.set_xlim([start, end])
             plt.locator_params(axis='y', nbins=5)
 
+            plt.tight_layout()
+            plt.subplots_adjust(top=.8)
+
             return fig
 
     def plt_spiketimes(self):
@@ -519,6 +524,9 @@ class Spikes(dj.Computed):
             ax.set_ylabel('Voltage [mV]', labelpad=20)
             ax.set_xlabel('Time [s]', labelpad=20)
             plt.locator_params(axis='y', nbins=5)
+
+            plt.tight_layout()
+            plt.subplots_adjust(top=.8)
 
             return  fig
 
@@ -852,6 +860,9 @@ class STA(dj.Computed):
                 cbar.set_label('s.d. units', labelpad=40, rotation=270)
 
                 plt.suptitle('STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
+
+                plt.tight_layout()
+                plt.subplots_adjust(top=.8)
 
                 return fig
 
@@ -1223,7 +1234,7 @@ class Overlay(dj.Computed):
 
             ax[0].set_xticklabels([])
             ax[0].set_yticklabels([])
-            ax[0].set_title('original', y=1.05)
+            ax[0].set_title('original')
 
             ax[1].imshow(rf_pad, cmap=plt.cm.coolwarm)
             ax[1].imshow(line_shift, cmap=plt.cm.gray, clim=clim)
@@ -1235,9 +1246,12 @@ class Overlay(dj.Computed):
 
             ax[1].set_xticklabels([])
             ax[1].set_yticklabels([])
-            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.05)
+            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu))
 
-            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), y=1.05,fontsize=16)
+            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+
+            plt.tight_layout()
+            plt.subplots_adjust(top=.8)
 
             return fig
 
@@ -1457,6 +1471,9 @@ class Chirp(dj.Computed):
             axarr[0].set_yticks([0, 127, 250])
             axarr[0].set_xlim(0, loop_duration_s)
 
+            plt.tight_layout()
+            plt.subplots_adjust(top=.8)
+
             return fig
 
 
@@ -1576,7 +1593,7 @@ class DS(dj.Computed):
 
             with sns.axes_style('whitegrid'):
                 fig = plt.figure()
-                plt.suptitle('Directional Tuning\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=18, y=1.1)
+                plt.suptitle('Directional Tuning\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
                 ax = plt.axes(polar=True, axisbg='white')
                 width = .2
@@ -1594,6 +1611,9 @@ class DS(dj.Computed):
                 ax.annotate('DSI: ' + str("%.2f" % round(dsi, 2)), xy=(.9, .3), xycoords='figure fraction', size=16)
                 # ax.annotate('.85,.2', xy = (.85,.2), xycoords = 'figure fraction')
                 # ax.annotate('.9,.3', xy = (.9,.3), xycoords = 'figure fraction')
+
+                plt.tight_layout()
+                plt.subplots_adjust(top=.8)
 
                 return fig
 
@@ -1721,7 +1741,15 @@ class DS(dj.Computed):
                 ax.set_xticklabels(column_labels, minor=False)
                 ax.set_yticklabels(row_labels, minor=False)
 
-                return fig
+                plt.tight_layout()
+                plt.subplots_adjust(top=.8)
+
+                return fig1, fig2
+
+            plt.tight_layout()
+            plt.subplots_adjust(top=.8)
+
+            return fig1
 
 
 @schema
@@ -1830,7 +1858,7 @@ class OnOff(dj.Computed):
             offset = np.min(voltage_trace)
 
             fig1, axarr = plt.subplots(4, int(np.ceil(len(triggertimes) / 2)), sharex=True, sharey=True)
-            plt.suptitle('Spot response\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=18)
+            plt.suptitle('Spot response\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             for i in range(len(v_trace_trial)):
                 rowidx = 2 * int(np.ceil((i + 1) / (len(v_trace_trial) * .5)) - 1)
@@ -1870,7 +1898,13 @@ class OnOff(dj.Computed):
                 plt.ylabel('trial')
                 plt.title('Membrane potential')
 
-            return fig
+                plt.tight_layout()
+                plt.subplots_adjust(top=.8)
+                return fig1, fig2
+
+            plt.tight_layout()
+            plt.subplots_adjust(top=.8)
+            return fig1
 
 
 def addEntry(animal_id,sex,date_of_birth,exp_date,experimenter,eye,cell_id,data_folder,rec_type, ch_voltage, ch_trigger,filename):
