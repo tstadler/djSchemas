@@ -938,7 +938,7 @@ class STA(dj.Computed):
             eye = (Experiment() & key).fetch1['eye']
 
             fig = plt.figure()
-            fig.suptitle(' STA at $\Delta$ t: ' + str(tau) + ' ms (upper panel) and SVD (lower panel) \n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16, y = 1.1)
+            fig.suptitle(' STA at $\Delta$ t: ' + str(tau) + ' ms (upper panel) and SVD (lower panel) \n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             fig.add_subplot(2, 3, 1)
 
@@ -987,6 +987,9 @@ class STA(dj.Computed):
             ax.set_xlim([100, -deltat])
             plt.xlabel('time [ms]', labelpad=10)
             plt.ylabel('stimulus intensity', labelpad=20)
+
+            plt.tight_layout()
+            plt.subplots_adjust(top=.9)
 
             return fig
 
