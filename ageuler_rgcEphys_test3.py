@@ -448,6 +448,8 @@ class Spikes(dj.Computed):
             ax.set_xlim([start, end])
             plt.locator_params(axis='y', nbins=5)
 
+            return fig
+
     def plt_spiketimes(self):
 
         start = int(input('Plot voltage trace from (in s): '))
@@ -515,6 +517,8 @@ class Spikes(dj.Computed):
             ax.set_ylabel('Voltage [mV]', labelpad=20)
             ax.set_xlabel('Time [s]', labelpad=20)
             plt.locator_params(axis='y', nbins=5)
+
+            return  fig
 
 @schema
 class Trigger(dj.Computed):
@@ -847,6 +851,8 @@ class STA(dj.Computed):
 
                 plt.suptitle('STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
+                return fig
+
     def plt_contour(self):
 
         from matplotlib import ticker
@@ -887,6 +893,8 @@ class STA(dj.Computed):
 
             cb.locator = tick_locator
             cb.update_ticks()
+
+            return fig
 
     def plt_svd(self):
 
@@ -969,6 +977,8 @@ class STA(dj.Computed):
             ax.set_xlim([100, -deltat])
             plt.xlabel('time [ms]', labelpad=10)
             plt.ylabel('stimulus intensity', labelpad=20)
+
+            return fig
 
 @schema
 class Overlay(dj.Computed):
@@ -1161,6 +1171,8 @@ class Overlay(dj.Computed):
 
             plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),y = 1.05, fontsize=16)
 
+            return fig
+
     def overlay_gauss(self):
 
         for key in self.project().fetch.as_dict:
@@ -1221,6 +1233,8 @@ class Overlay(dj.Computed):
             ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu), y=1.05)
 
             plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), y=1.05,fontsize=16)
+
+            return fig
 
 
 @schema
@@ -1438,6 +1452,8 @@ class Chirp(dj.Computed):
             axarr[0].set_yticks([0, 127, 250])
             axarr[0].set_xlim(0, loop_duration_s)
 
+            return fig
+
 
 @schema
 class DSParams(dj.Computed):
@@ -1574,6 +1590,8 @@ class DS(dj.Computed):
                 # ax.annotate('.85,.2', xy = (.85,.2), xycoords = 'figure fraction')
                 # ax.annotate('.9,.3', xy = (.9,.3), xycoords = 'figure fraction')
 
+                return fig
+
     def plt_ds_traces(self):
 
         for key in self.project().fetch.as_dict:
@@ -1698,6 +1716,8 @@ class DS(dj.Computed):
                 ax.set_xticklabels(column_labels, minor=False)
                 ax.set_yticklabels(row_labels, minor=False)
 
+                return fig
+
 
 @schema
 class OnOff(dj.Computed):
@@ -1739,6 +1759,8 @@ class OnOff(dj.Computed):
 
         pol = len(spikes_on) / len(spikes_off)
         self.insert1(dict(key, pol=pol))
+
+
 
     def plt_on_off(self):
 
@@ -1842,6 +1864,8 @@ class OnOff(dj.Computed):
                 plt.xlabel('time [s]')
                 plt.ylabel('trial')
                 plt.title('Membrane potential')
+
+            return fig
 
 
 def addEntry(animal_id,sex,date_of_birth,exp_date,experimenter,eye,cell_id,data_folder,rec_type, ch_voltage, ch_trigger,filename):
