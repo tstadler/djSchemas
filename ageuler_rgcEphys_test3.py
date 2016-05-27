@@ -861,9 +861,6 @@ class STA(dj.Computed):
 
                 plt.suptitle('STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
-                plt.tight_layout()
-                plt.subplots_adjust(top=.8)
-
                 return fig
 
     def plt_contour(self):
