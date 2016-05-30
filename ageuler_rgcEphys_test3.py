@@ -1418,7 +1418,7 @@ class Cut(dj.Computed):
 
             width = .8
             x = np.linspace(0, dens1.shape[0] - width, dens1.shape[0])
-            fig, ax = plt.subplots(1, 2)
+            fig, ax = plt.subplots(1, 2, sharey=True)
             ax[0].bar(x, dens1, color=cols1)
             ax[0].set_xlabel('stack height')
             ax[0].set_ylabel('density of non-zero data points', labelpad=20)
