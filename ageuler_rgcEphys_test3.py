@@ -1309,14 +1309,6 @@ class Cut(dj.Computed):
     def _make_tuples(self,key):
 
         stack = (Morph() & key).fetch1['stack'][::-1]
-        (scan_z, scan_x, scan_y) = (Morph() & key).fetch1['scan_z', 'scan_x', 'scan_y']
-        zoom = (Morph() & key).fetch1['zoom']
-        scan_size = (Morph() & key).fetch1['scan_size']
-        (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
-
-        shift_x, shift_y = (Overlay() & key).fetch1['shift_x', 'shift_y']
-        (dx, dy) = (BWNoise() & key).fetch1['delx', 'dely']
-        rf = (STA() & key).fetch1['rf']
 
         morph_vert1 = np.mean(stack, 1)
         morph_vert2 = np.mean(stack, 2)
