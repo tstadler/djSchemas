@@ -1301,8 +1301,10 @@ class Cut(dj.Computed):
     ->Morph
     ---
     stack_wos   :longblob
-    idx_cut1    :int
-    idx_cut2    :int
+    dens1       :longblob
+    dens2       :longblob
+    idx_thr1    :longblob
+    idx_thr2    :longblob
     idx_cut     :int
     """
 
@@ -1333,7 +1335,7 @@ class Cut(dj.Computed):
 
 
 
-        self.insert1(dict(key,stack_wos = stack[0:idx_cut,:,:], idx_cut1 = idx_cut1, idx_cut2 = idx_cut2, idx_cut = idx_cut))
+        self.insert1(dict(key,stack_wos = stack[0:idx_cut,:,:], dens1 = dens1, dens2 = dens2,idx_thr1 = idx_thr1, idx_thr2 = idx_thr2, idx_cut = idx_cut))
 
     def plt_cut(self):
 
@@ -1352,7 +1354,7 @@ class Cut(dj.Computed):
             )
 
             stack = (Morph() & key).fetch1['stack'][::-1]
-            (idx_cut1, idx_cut2) = (self & key).fetch1['idx_cut1', 'idx_cut2']
+            (idx_thr1, idx_thr2) = (self & key).fetch1['idx_thr1', 'idx_thr2']
 
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
@@ -1360,6 +1362,9 @@ class Cut(dj.Computed):
 
             morph_vert1 = np.mean(stack, 1)
             morph_vert2 = np.mean(stack, 2)
+
+            idx_cut1 = idx_thr1.max()
+            idx_cut2 = idx_thr2.max()
 
             with sns.axes_style({'grid.color': 'r'}):
 
@@ -1380,6 +1385,50 @@ class Cut(dj.Computed):
                 fig_cut.subplots_adjust(top=.88)
 
                 return fig_cut
+
+    def plt_density(self):
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (15, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .2,
+                 'lines.linewidth': 1
+                 }
+            )
+            dens1,dens2 = (self & key).fetch1['dens1','dens2']
+            idx_thr1, idx_thr2 = (self & key).fetch1['idx_thr1','idx_thr2']
+
+            cols1 = ['b'] * len(dens1)
+            for i in idx_thr1:
+                cols1[i] = 'r'
+
+            cols2 = ['b'] * len(dens2)
+            for i in idx_thr2:
+                cols2[i] = 'r'
+
+            width = .8
+            x = np.linspace(0, dens1.shape[0] - width, dens1.shape[0])
+            fig, ax = plt.subplots(1, 2)
+            ax[0].bar(x, dens1, color=cols1)
+            ax[0].set_xlabel('stack height')
+            ax[0].set_ylabel('density of non-zero data points', labelpad=20)
+            ax[0].set_xticks([10, dens1.shape[0] - 10])
+            ax[0].set_xticklabels(['IPL', 'GCL'])
+
+            ax[1].bar(x, dens2, color=cols2)
+            ax[1].set_xlabel('stack height')
+            ax[1].set_xticks([10, dens2.shape[0] - 10])
+            ax[1].set_xticklabels(['IPL', 'GCL'])
+
+            plt.locator_params(axis='y', nbins=4)
+
+
 
 
 
