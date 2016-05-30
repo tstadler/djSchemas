@@ -1037,7 +1037,7 @@ class Overlay(dj.Computed):
         stack = (Morph() & key).fetch1['stack']
         (scan_z, scan_x, scan_y) = (Morph() & key).fetch1['scan_z', 'scan_x', 'scan_y']
         zoom = (Morph() & key).fetch1['zoom']
-        morph_size = (Morph() & key).fetch1['morph_size']
+        scan_size = (Morph() & key).fetch1['scan_size']
         (dx_morph, dy_morph) = (Morph() & key).fetch1['dx','dy']
         (dx, dy) = (BWNoise() & key).fetch1['delx', 'dely']
 
@@ -1046,8 +1046,8 @@ class Overlay(dj.Computed):
 
         morph = np.mean(stack, 0)
 
-        dely = (rf.shape[1] * dy - morph_size) / 2  # missing at each side of stack to fill stimulus in um
-        delx = (rf.shape[0] * dx - morph_size) / 2
+        dely = (rf.shape[1] * dy - scan_size) / 2  # missing at each side of stack to fill stimulus in um
+        delx = (rf.shape[0] * dx - scan_size) / 2
 
         ny_pad = int(dely / dy_morph)  # number of pixels needed to fill the gap
         nx_pad = int(delx / dx_morph)
