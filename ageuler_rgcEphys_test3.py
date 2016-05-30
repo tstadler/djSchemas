@@ -134,13 +134,13 @@ class Morph(dj.Computed):
     def plt_morph(self):
 
         plt.rcParams.update(
-            {'figure.figsize': (12, 8),
+            {'figure.figsize': (15, 10),
              'axes.titlesize': 16,
              'axes.labelsize': 16,
              'xtick.labelsize': 16,
              'ytick.labelsize': 16,
-             'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .3
+             'figure.subplot.hspace': 0,
+             'figure.subplot.wspace': .2
              }
         )
 
@@ -153,13 +153,25 @@ class Morph(dj.Computed):
             eye = (Experiment() & key).fetch1['eye']
             cell_id = (Cell() & key).fetch1['cell_id']
 
-            morph = np.mean(stack,0)
+            morph_vert1 = np.mean(stack[::-1], 1)
+            morph_vert2 = np.mean(stack[::-1], 2)
+            morph = np.mean(stack, 0)
+            clim = (0,.01)
 
-            fig,ax = plt.subplots()
-            plt.tight_layout()
-            plt.imshow(morph, cmap=plt.cm.gray_r, clim=(0, .01))
-            plt.suptitle('Mean over binarized stack in z-axis\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
-            ax.annotate('df size in x [um]: %.2f\ndf size in y [um]: %.2f'%(df_size_x,df_size_y),xy = (20,20),fontsize=14)
+            fig = plt.figure()
+            fig.add_subplot(1, 2, 1)
+            plt.imshow(morph, clim=clim)
+
+            fig.add_subplot(2, 2, 2)
+            plt.imshow(morph_vert1, clim=clim)
+
+            fig.add_subplot(2, 2, 4)
+            plt.imshow(morph_vert2, clim=clim)
+
+            ax = fig.get_axes()
+            ax[0].annotate('df size in x [um]: %.2f\ndf size in y [um]: %.2f'%(df_size_x,df_size_y),xy = (20,20),fontsize=14)
+
+            plt.suptitle('Linestack\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
 
             plt.tight_layout()
             plt.subplots_adjust(top=.8)
