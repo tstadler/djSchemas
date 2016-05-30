@@ -79,7 +79,7 @@ class Morph(dj.Computed):
     dx          :double         # pixel side length in um
     dy          :double         # pixel side length in um
     zoom        :double         # zoom factor
-    scan_size  :double         # side length of scan in um
+    scan_size   :double         # side length of scan in um
     df_size_x   :double         # df size in um
     df_size_y   :double         # df size in um
     """
@@ -108,13 +108,13 @@ class Morph(dj.Computed):
         config = ConfigParser()
         config.read(path + folder + 'C' + str(cell_id) + '_' + str(exp_date) + '.ini')
         zoom = config.getfloat('morph', 'zoom')
-        morph_size = .64 / zoom * 110  # side length of stack image in um
+        scan_size = .64 / zoom * 110  # side length of stack image in um
 
         scan_x = stack.shape[1]
         scan_y = stack.shape[2]
 
-        dx_morph = morph_size / scan_x  # morph pixel side length in um
-        dy_morph = morph_size / scan_y  # morph pixel side length in um
+        dx_morph = scan_size / scan_x  # morph pixel side length in um
+        dy_morph = scan_size / scan_y  # morph pixel side length in um
 
         morph = np.mean(stack, 0)
 
@@ -129,7 +129,7 @@ class Morph(dj.Computed):
         df_size_x = (delx.max() + 1) * dx_morph
         df_size_y = (dely.max() + 1) * dy_morph
 
-        self.insert1(dict(key, stack = stack_bin, scan_z = stack.shape[0], scan_y = scan_y, scan_x = scan_x,dx=dx_morph, dy=dy_morph, zoom = zoom, morph_size=morph_size,df_size_x = df_size_x,df_size_y = df_size_y))
+        self.insert1(dict(key, stack = stack_bin, scan_z = stack.shape[0], scan_y = scan_y, scan_x = scan_x,dx=dx_morph, dy=dy_morph, zoom = zoom, scan_size=scan_size,df_size_x = df_size_x,df_size_y = df_size_y))
 
     def plt_morph(self):
 
