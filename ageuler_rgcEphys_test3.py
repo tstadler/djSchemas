@@ -79,7 +79,9 @@ class Morph(dj.Computed):
     dx          :double         # pixel side length in um
     dy          :double         # pixel side length in um
     zoom        :double         # zoom factor
-    morph_size  :double     # side length of morph in um
+    scan_size  :double         # side length of scan in um
+    df_size_x   :double         # df size in um
+    df_size_y   :double         # df size in um
     """
 
     @property
@@ -114,7 +116,20 @@ class Morph(dj.Computed):
         dx_morph = morph_size / scan_x  # morph pixel side length in um
         dy_morph = morph_size / scan_y  # morph pixel side length in um
 
-        self.insert1(dict(key, stack = stack_bin, scan_z = stack.shape[0], scan_y = scan_y, scan_x = scan_x,dx=dx_morph, dy=dy_morph, zoom = zoom, morph_size=morph_size))
+        morph = np.mean(stack, 0)
+
+        mask = np.ma.masked_where(morph == 0, morph)
+
+        edges0 = np.ma.notmasked_edges(mask, axis=0)
+        edges1 = np.ma.notmasked_edges(mask, axis=1)
+
+        dely = edges0[1][0] - edges0[0][0]
+        delx = edges1[1][1] - edges1[0][1]
+
+        df_size_x = (delx.max() + 1) * dx_morph
+        df_size_y = (dely.max() + 1) * dy_morph
+
+        self.insert1(dict(key, stack = stack_bin, scan_z = stack.shape[0], scan_y = scan_y, scan_x = scan_x,dx=dx_morph, dy=dy_morph, zoom = zoom, morph_size=morph_size,df_size_x = df_size_x,df_size_y = df_size_y))
 
     def plt_morph(self):
 
@@ -132,6 +147,7 @@ class Morph(dj.Computed):
         for key in self.project().fetch.as_dict:
 
             stack = (self & key).fetch1['stack']
+            df_size_x, df_size_y = (self & key).fetch1['df_size_x', 'df_size_y']
 
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
@@ -139,10 +155,11 @@ class Morph(dj.Computed):
 
             morph = np.mean(stack,0)
 
-            fig = plt.subplots()
+            fig,ax = plt.subplots()
             plt.tight_layout()
             plt.imshow(morph, cmap=plt.cm.gray_r, clim=(0, .01))
             plt.suptitle('Mean over binarized stack in z-axis\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+            ax.annotate('df size in x [um]: %.2f\ndf size in y [um]: %.2f'%(df_size_x,df_size_y),xy = (20,20),fontsize=14)
 
             plt.tight_layout()
             plt.subplots_adjust(top=.8)
@@ -1211,10 +1228,14 @@ class Overlay(dj.Computed):
             params_m, params_m_shift, params_rf = (self & key).fetch1['gauss_m','gauss_m_shift','gauss_rf']
 
             (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
+            (df_size_x,df_size_y) = (Morph() & key).fetch1['df_size_x','df_size_y']
 
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
             cell_id = (Cell() & key).fetch1['cell_id']
+
+            rf_size_x = 2*params_rf[3]*dx_morph
+            rf_size_y = 2*params_rf[4]*dy_morph
 
             line_pad = np.ma.masked_where(morph_pad == 0, morph_pad)
             line_shift = np.ma.masked_where(morph_shift == 0, morph_shift)
@@ -1234,6 +1255,9 @@ class Overlay(dj.Computed):
             ax[0].set_xticklabels([])
             ax[0].set_yticklabels([])
             ax[0].set_title('original')
+            ax[0].annotate('rf 2 s.d. in x [um]: %.2f \nrf 2 s.d. in y [um]: %.2f' % (rf_size_x, rf_size_y),
+                              xy=(20, 150), fontsize=14)
+
 
             ax[1].imshow(rf_pad, cmap=plt.cm.coolwarm)
             ax[1].imshow(line_shift, cmap=plt.cm.gray, clim=clim)
@@ -1246,6 +1270,8 @@ class Overlay(dj.Computed):
             ax[1].set_xticklabels([])
             ax[1].set_yticklabels([])
             ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu))
+            ax[1].annotate('df size in x [um]: %.2f\ndf size in y [um]: %.2f' % (df_size_x, df_size_y), xy=(20, 150),
+                           fontsize=14)
 
             plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
 
