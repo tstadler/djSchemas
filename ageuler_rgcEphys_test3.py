@@ -1292,6 +1292,108 @@ class Overlay(dj.Computed):
 
             return fig
 
+@schema
+class Blur(dj.Computed):
+
+    definition="""
+    # Blur RF and calc correlation with rf
+
+    ->Overlay
+    ---
+    stack_wos   :longblob
+    idx_cut1    :int
+    idx_cut2    :int
+    idx_cut     :int
+    blur        :longblob
+    blur_pad    :longblob
+    """
+
+    def _make_tuples(self,key):
+
+        stack = (Morph() & key).fetch1['stack'][::-1]
+        (scan_z, scan_x, scan_y) = (Morph() & key).fetch1['scan_z', 'scan_x', 'scan_y']
+        zoom = (Morph() & key).fetch1['zoom']
+        scan_size = (Morph() & key).fetch1['scan_size']
+        (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
+
+        shift_x, shift_y = (Overlay() & key).fetch1['shift_x', 'shift_y']
+        (dx, dy) = (BWNoise() & key).fetch1['delx', 'dely']
+        rf = (STA() & key).fetch1['rf']
+
+        morph_vert1 = np.mean(stack, 1)
+        morph_vert2 = np.mean(stack, 2)
+
+        ma_vert1 = np.ma.masked_where(morph_vert1 == 0, morph_vert1)
+        ma_vert2 = np.ma.masked_where(morph_vert2 == 0, morph_vert2)
+
+        counts1 = ma_vert1.count(axis=1)
+        dens1 = counts1 / counts1.sum()
+
+        counts2 = ma_vert2.count(axis=1)
+        dens2 = counts2 / counts2.sum()
+
+        idx_thr1 = np.where(dens1 == dens1[dens1 != 0].min())[0]
+        idx_thr2 = np.where(dens2 == dens2[dens2 != 0].min())[0]
+
+        idx_cut1 = idx_thr1.max()
+        idx_cut2 = idx_thr2.max()
+
+        idx_cut = np.max([idx_cut1, idx_cut2])
+        morph = np.mean(stack[0:idx_cut, :, :], 0)
+
+        self.insert1(dict(key,stack_wos = stack[0:idx_cut,:,:], idx_cut1 = idx_cut1, idx_cut2 = idx_cut2, idx_cut = idx_cut))
+
+    def plt_morph(self):
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (15, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': 0,
+                 'figure.subplot.wspace': .2,
+                 'lines.linewidth': 1
+                 }
+            )
+
+            stack_wos = (self & key).fetch1['stack_wos']
+            (idx_cut1, idx_cut2) = (self & key).fetch1['idx_cut1', 'idx_cut2']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
+            morph_vert1 = np.mean(stack_wos, 1)
+            morph_vert2 = np.mean(stack_wos, 2)
+
+            with sns.axes_style({'grid.color': 'r'}):
+
+                fig_cut, ax = plt.subplots(2, 1)
+                fig_cut.tight_layout()
+                clim = (0, .01)
+
+                ax[0].imshow(morph_vert1, clim=clim)
+                ax[0].set_yticks([idx_cut1])
+                ax[0].set_xticks([])
+
+                ax[1].imshow(morph_vert2, clim=clim)
+                ax[1].set_yticks([idx_cut2])
+                ax[1].set_xticks([])
+
+                fig_cut.suptitle('Morph without soma\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+
+                fig_cut.tight_layout()
+                fig_cut.subplots_adjust(top=.88)
+
+            return fig_cut
+
+
+
+
+
 
 @schema
 class ChirpParams(dj.Computed):
