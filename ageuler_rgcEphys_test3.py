@@ -1372,7 +1372,6 @@ class Blur(dj.Computed):
             with sns.axes_style({'grid.color': 'r'}):
 
                 fig_cut, ax = plt.subplots(2, 1)
-                fig_cut.tight_layout()
                 clim = (0, .01)
 
                 ax[0].imshow(morph_vert1, clim=clim)
@@ -1383,12 +1382,12 @@ class Blur(dj.Computed):
                 ax[1].set_yticks([idx_cut2])
                 ax[1].set_xticks([])
 
-                fig_cut.suptitle('Morph without soma\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+                fig_cut.suptitle('Proposed cut-off\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
 
                 fig_cut.tight_layout()
                 fig_cut.subplots_adjust(top=.88)
 
-            return fig_cut
+                return fig_cut
 
 
 
