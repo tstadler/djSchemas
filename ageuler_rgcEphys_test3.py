@@ -1404,6 +1404,10 @@ class Cut(dj.Computed):
             dens1,dens2 = (self & key).fetch1['dens1','dens2']
             idx_thr1, idx_thr2 = (self & key).fetch1['idx_thr1','idx_thr2']
 
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
             cols1 = ['b'] * len(dens1)
             for i in idx_thr1:
                 cols1[i] = 'r'
@@ -1421,12 +1425,20 @@ class Cut(dj.Computed):
             ax[0].set_xticks([10, dens1.shape[0] - 10])
             ax[0].set_xticklabels(['IPL', 'GCL'])
 
+            plt.locator_params(axis='y', nbins=4)
+
             ax[1].bar(x, dens2, color=cols2)
             ax[1].set_xlabel('stack height')
             ax[1].set_xticks([10, dens2.shape[0] - 10])
             ax[1].set_xticklabels(['IPL', 'GCL'])
 
             plt.locator_params(axis='y', nbins=4)
+
+            fig.suptitle('Density profile\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            return fig
 
 
 
