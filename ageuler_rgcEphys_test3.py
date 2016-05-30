@@ -1293,19 +1293,17 @@ class Overlay(dj.Computed):
             return fig
 
 @schema
-class Blur(dj.Computed):
+class Cut(dj.Computed):
 
     definition="""
     # Blur RF and calc correlation with rf
 
-    ->Overlay
+    ->Morph
     ---
     stack_wos   :longblob
     idx_cut1    :int
     idx_cut2    :int
     idx_cut     :int
-    blur        :longblob
-    blur_pad    :longblob
     """
 
     def _make_tuples(self,key):
@@ -1341,9 +1339,11 @@ class Blur(dj.Computed):
         idx_cut = np.max([idx_cut1, idx_cut2])
         morph = np.mean(stack[0:idx_cut, :, :], 0)
 
+
+
         self.insert1(dict(key,stack_wos = stack[0:idx_cut,:,:], idx_cut1 = idx_cut1, idx_cut2 = idx_cut2, idx_cut = idx_cut))
 
-    def plt_morph(self):
+    def plt_cut(self):
 
         for key in self.project().fetch.as_dict:
 
