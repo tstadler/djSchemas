@@ -1353,21 +1353,21 @@ class Blur(dj.Computed):
                  'axes.labelsize': 16,
                  'xtick.labelsize': 16,
                  'ytick.labelsize': 16,
-                 'figure.subplot.hspace': 0,
+                 'figure.subplot.hspace': .2,
                  'figure.subplot.wspace': .2,
                  'lines.linewidth': 1
                  }
             )
 
-            stack_wos = (self & key).fetch1['stack_wos']
+            stack = (Morph() & key).fetch1['stack'][::-1]
             (idx_cut1, idx_cut2) = (self & key).fetch1['idx_cut1', 'idx_cut2']
 
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
             cell_id = (Cell() & key).fetch1['cell_id']
 
-            morph_vert1 = np.mean(stack_wos, 1)
-            morph_vert2 = np.mean(stack_wos, 2)
+            morph_vert1 = np.mean(stack, 1)
+            morph_vert2 = np.mean(stack, 2)
 
             with sns.axes_style({'grid.color': 'r'}):
 
