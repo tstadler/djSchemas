@@ -1328,13 +1328,13 @@ class Cut(dj.Computed):
         idx_thr2 = np.where(dens2 == dens2[dens2 != 0].min())[0]
 
         fig_c = self.show_cut(stack,idx_thr1,idx_thr2)
-        display(fig_c)
+        #display(fig_c)
 
         adjust = bool(int(input('Adjust cut off? [Yes:1 , No:0]: ')))
 
         if adjust:
             fig_d = self.show_density(dens1,dens2,idx_thr1,idx_thr2)
-            display(fig_d)
+            #display(fig_d)
 
             idx_cut = int(input('Select frame according to density profile: '))
 
@@ -1414,15 +1414,15 @@ class Cut(dj.Computed):
         ax[0].bar(x, dens1, color=cols1)
         ax[0].set_xlabel('stack height')
         ax[0].set_ylabel('density of non-zero data points', labelpad=20)
-        ax[0].set_xticks([10, dens1.shape[0] - 10])
-        ax[0].set_xticklabels(['IPL', 'GCL'])
+        ax[0].set_xticks([10, int(dens1.shape[0]/2),dens1.shape[0] - 10])
+        ax[0].set_xticklabels(['IPL', dens1.shape[0]/2,'GCL'])
 
         plt.locator_params(axis='y', nbins=4)
 
         ax[1].bar(x, dens2, color=cols2)
         ax[1].set_xlabel('stack height')
-        ax[1].set_xticks([10, dens2.shape[0] - 10])
-        ax[1].set_xticklabels(['IPL', 'GCL'])
+        ax[1].set_xticks([10, int(dens2.shape[0]/2),dens2.shape[0] - 10])
+        ax[1].set_xticklabels(['IPL', dens2.shape[0]/2,'GCL'])
 
         plt.locator_params(axis='y', nbins=4)
         fig.tight_layout()
