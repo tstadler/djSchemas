@@ -1350,7 +1350,7 @@ class Cut(dj.Computed):
 
         self.insert1(dict(key,stack_wos = stack[0:idx_cut,:,:], dens1 = dens1, dens2 = dens2,idx_thr1 = idx_thr1, idx_thr2 = idx_thr2, idx_cut = idx_cut))
 
-    def show_cut(stack,idx_thr1,idx_thr2):
+    def show_cut(self,stack,idx_thr1,idx_thr2):
 
         plt.rcParams.update(
             {'figure.figsize': (15, 8),
@@ -1387,7 +1387,7 @@ class Cut(dj.Computed):
 
             return fig_cut
 
-    def show_density(dens1,dens2,idx_thr1,idx_thr2):
+    def show_density(self,dens1,dens2,idx_thr1,idx_thr2):
 
         plt.rcParams.update(
             {'figure.figsize': (15, 8),
