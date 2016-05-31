@@ -1535,9 +1535,6 @@ class Cut(dj.Computed):
 
 
 
-
-
-
 @schema
 class ChirpParams(dj.Computed):
     definition="""
@@ -2250,7 +2247,7 @@ def addEntry(animal_id,sex,date_of_birth,exp_date,experimenter,eye,cell_id,data_
         print('Recording new')
 
         try:
-            if 'BWNoise' in filename:
+            if 'Noise' in filename:
                 R.insert1(
                     {'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'cell_id': cell_id, 'filename': filename,
                      'stim_type': 'bw_noise', 'rec_type': rec_type, 'ch_voltage': ch_voltage, 'ch_trigger': ch_trigger})
