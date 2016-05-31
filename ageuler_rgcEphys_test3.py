@@ -1328,13 +1328,13 @@ class Cut(dj.Computed):
         idx_thr2 = np.where(dens2 == dens2[dens2 != 0].min())[0]
 
         fig_c = self.show_cut(stack,idx_thr1,idx_thr2)
-        #display(fig_c)
+        display(fig_c)
 
         adjust = bool(int(input('Adjust cut off? [Yes:1 , No:0]: ')))
 
         if adjust:
             fig_d = self.show_density(dens1,dens2,idx_thr1,idx_thr2)
-            #display(fig_d)
+            display(fig_d)
 
             idx_cut = int(input('Select frame according to density profile: '))
 
