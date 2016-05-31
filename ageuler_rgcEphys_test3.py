@@ -1418,6 +1418,7 @@ class Cut(dj.Computed):
         ax[0].set_ylabel('density of non-zero data points', labelpad=20)
         ax[0].set_xticks([0,10, int(dens1.shape[0]/2),dens1.shape[0] - 10,dens1.shape[0]])
         ax[0].set_xticklabels(['IPL',10, dens1.shape[0]/2,dens1.shape[0] - 10,'GCL'])
+        ax[0].set_xlim([0,dens1.shape[0]])
 
         plt.locator_params(axis='y', nbins=4)
 
@@ -1425,6 +1426,7 @@ class Cut(dj.Computed):
         ax[1].set_xlabel('stack height')
         ax[1].set_xticks([0,10, int(dens2.shape[0]/2),dens2.shape[0] - 10,dens2.shape[0]])
         ax[1].set_xticklabels(['IPL',10, dens2.shape[0]/2,dens2.shape[0] - 10,'GCL'])
+        ax[1].set_xlim([0, dens2.shape[0]])
 
         plt.locator_params(axis='y', nbins=4)
         fig.tight_layout()
