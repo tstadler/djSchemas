@@ -1338,7 +1338,7 @@ class Cut(dj.Computed):
             display(fig_d)
             plt.close(fig_d)
 
-            idx_cut = int(input('Select frame according to density profile: '))
+            idx_cut = int(input('Select frame [int] above which everything will be cut off: '))
 
         else:
             idx_cut1 = idx_thr1.max()
@@ -1416,16 +1416,12 @@ class Cut(dj.Computed):
         ax[0].bar(x, dens1, color=cols1)
         ax[0].set_xlabel('stack height')
         ax[0].set_ylabel('density of non-zero data points', labelpad=20)
-        ax[0].set_xticks([0,10,idx_thr1,dens1.shape[0]-10,dens1.shape[0]])
-        ax[0].set_xticklabels(['IPL',10,idx_thr1,dens1.shape[0]-10,'GCL'])
         ax[0].set_xlim([0,dens1.shape[0]])
 
         plt.locator_params(axis='y', nbins=4)
 
         ax[1].bar(x, dens2, color=cols2)
         ax[1].set_xlabel('stack height')
-        ax[1].set_xticks([0,10,idx_thr2,dens2.shape[0]-10,dens2.shape[0]])
-        ax[1].set_xticklabels(['IPL',10,idx_thr2,dens2.shape[0]-10,'GCL'])
         ax[1].set_xlim([0, dens2.shape[0]])
 
         plt.locator_params(axis='y', nbins=4)
