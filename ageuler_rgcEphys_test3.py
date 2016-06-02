@@ -108,7 +108,7 @@ class Morph(dj.Computed):
         config = ConfigParser()
         config.read(path + folder + 'C' + str(cell_id) + '_' + str(exp_date) + '.ini')
         zoom = config.getfloat('morph', 'zoom')
-        scan_size = .64 / zoom * 110  # side length of stack image in um
+        scan_size = 1/ zoom * 71.5  # side length of stack image in um
 
         scan_x = stack.shape[1]
         scan_y = stack.shape[2]
