@@ -1613,7 +1613,7 @@ class LnpExp(dj.Computed):
         kf = KFold(T, n_folds=k)
 
         for train, test in kf:
-            res = scoptimize.minimize(self.nll_exp, w0, args=(s[:, train], y[train]), jac=jac, method='TNC')
+            res = scoptimize.minimize(self.nll_exp, w0, args=(s[:, train], y[train]), jac=True, method='TNC')
             print(res.message, 'neg log-liklhd: ', res.fun)
 
             LNP_dict['nLL train'].append(res.fun)
