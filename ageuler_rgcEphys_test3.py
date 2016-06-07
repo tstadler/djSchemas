@@ -1608,7 +1608,7 @@ class LnpExp(dj.Computed):
         LNP_dict['pred psth'] = []
         LNP_dict['true psth'] = []
 
-        w0 = np.zeros(s.shape)
+        w0 = np.zeros(s.shape[0])
         k= 6
         kf = KFold(T, n_folds=k)
 
