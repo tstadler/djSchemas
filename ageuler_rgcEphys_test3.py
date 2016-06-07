@@ -1639,8 +1639,8 @@ class LnpExp(dj.Computed):
                           rf = LNP_df['w'][idx],
                           pred = LNP_df['pred correct'][idx],
                           pears_r = LNP_df['pearson r'][idx],
-                          r2 = LNP_df['R2'][idx],
-                          pred_psth = LNP_df['pred psth'][idx]
+                          r2 = LNP_df['R2'][idx]
+                          #pred_psth = LNP_df['pred psth'][idx]
                           ))#true_psth  = LNP_df['true psth'][idx]
 
     def nll_exp(self,wT,s,y):
