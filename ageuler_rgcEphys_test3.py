@@ -1633,15 +1633,17 @@ class LnpExp(dj.Computed):
         LNP_df = pd.DataFrame(LNP_dict)
 
         idx = LNP_df['nLL test'].idxmin()
+        print(idx)
 
         self.insert1(dict(key,frames_conv = s_conv,
                           sta_inst = sta_inst,
                           rf = LNP_df['w'][idx],
                           pred = LNP_df['pred correct'][idx],
                           pears_r = LNP_df['pearson r'][idx],
-                          r2 = LNP_df['R2'][idx]
-                          #pred_psth = LNP_df['pred psth'][idx]
-                          ))#true_psth  = LNP_df['true psth'][idx]
+                          r2 = LNP_df['R2'][idx],
+                          pred_psth = LNP_df['pred psth'][idx],
+                          true_psth=LNP_df['true psth'][idx]
+                          ))
 
     def nll_exp(self,wT,s,y):
 
