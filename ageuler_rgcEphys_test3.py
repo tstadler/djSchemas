@@ -1609,6 +1609,7 @@ class LnpExp(dj.Computed):
         LNP_dict['true psth'] = []
 
         w0 = np.zeros(s.shape)
+        k= 6
         kf = KFold(T, n_folds=k)
 
         for train, test in kf:
