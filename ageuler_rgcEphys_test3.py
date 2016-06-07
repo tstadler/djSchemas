@@ -1633,7 +1633,8 @@ class LnpExp(dj.Computed):
         LNP_df = pd.DataFrame(LNP_dict)
 
         idx = LNP_df['nLL test'].idxmin()
-        print(LNP_df['w'][idx])
+        print('idx: ', idx)
+        print(LNP_df['w'][idx].shape)
 
         self.insert1(dict(key,frames_conv = s_conv,
                           sta_inst = sta_inst,
