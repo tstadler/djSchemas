@@ -1714,7 +1714,7 @@ class Blur(dj.Computed):
             im = ax.imshow(df_maxr, cmap=plt.cm.coolwarm, interpolation='nearest')
             ax.set_xticks([])
             ax.set_yticks([])
-            ax.set_title('$\sigma$ : %.0f' % (sig_maxr))
+            ax.set_title('$\sigma$ : %.1f' % (sig_maxr))
             cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.95)
             cbar.set_label('blurred df', labelpad=20, rotation=270, y=1.1)
             tick_locator = ticker.MaxNLocator(nbins=4)
@@ -1733,7 +1733,7 @@ class Blur(dj.Computed):
             cbar.update_ticks()
 
             fig.suptitle(str(key['exp_date']) + ': ' +  key['eye'] + ':' + str(key['cell_id']) + ': ' + key['filename'], fontsize=18)
-            fig.subplots_adjust(top=.8)
+            fig.subplots_adjust(top=.88)
 
 
             return fig
