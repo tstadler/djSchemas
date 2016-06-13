@@ -1123,8 +1123,8 @@ class Overlay(dj.Computed):
                           morph_pad = morph_pad,
                           morph_shift = morph_shift,
                           rf_pad = rf_pad,
-                          idx_center = idx_rfcenter,
-                          idx_soma = (int(idx_soma),int(idy_soma)),
+                          idx_center = np.array([idx_rfcenter]),
+                          idx_soma = np.array([int(idx_soma),int(idy_soma)]),
                           shift_x = int(shift_x),
                           shift_y = int(shift_y)
                           ))
