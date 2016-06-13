@@ -1334,30 +1334,57 @@ class Overlay(dj.Computed):
 
             if abs(shift_x) > nx_pad:
 
-                if shift_x > nx_pad:
+                if abs(shift_y) < ny_pad:
 
-                    morph_shift = np.lib.pad(morph, (
-                        (int(2 * nx_pad), 0), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
-                                             'constant',
-                                             constant_values=0)
-                else:
-                    morph_shift = np.lib.pad(morph, (
-                        (0, int(2 * nx_pad)), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
-                                             'constant',
-                                             constant_values=0)
-            if abs(shift_y) > ny_pad:
+                    if shift_x > nx_pad:
 
-                if shift_y > ny_pad:
+                        morph_shift = np.lib.pad(morph, (
+                            (int(2 * nx_pad), 0), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
+                                                 'constant',
+                                                 constant_values=0)
+                    else:
+                        morph_shift = np.lib.pad(morph, (
+                            (0, int(2 * nx_pad)), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
+                                                 'constant',
+                                                 constant_values=0)
+                elif abs(shift_y) > ny_pad:
 
-                    morph_shift = np.lib.pad(morph, (
-                        (nx_pad + int(shift_x), nx_pad - int(shift_x)), (int(2 * ny_pad), 0)),
-                                             'constant',
-                                             constant_values=0)
-                else:
-                    morph_shift = np.lib.pad(morph, (
-                        (nx_pad + int(shift_x), nx_pad - int(shift_x)), (0, int(2 * ny_pad))),
-                                             'constant',
-                                             constant_values=0)
+                    if (shift_x > nx_pad) & (shift_y > ny_pad):
+
+                        morph_shift = np.lib.pad(morph, (
+                            (int(2*nx_pad),0), (int(2 * ny_pad), 0)),
+                                                 'constant',
+                                                 constant_values=0)
+                    elif (shift_x < nx_pad) & (shift_y > ny_pad):
+                        morph_shift = np.lib.pad(morph, (
+                            (0,int(2*nx_pad)), (int(2 * ny_pad),0)),
+                                                 'constant',
+                                                 constant_values=0)
+                    elif (shift_x > nx_pad) & (shift_y < ny_pad):
+                        morph_shift = np.lib.pad(morph, (
+                            (int(2 * nx_pad),0), (0,int(2 * ny_pad))),
+                                                 'constant',
+                                                 constant_values=0)
+                    elif (shift_x < nx_pad) & (shift_y < ny_pad):
+                        morph_shift = np.lib.pad(morph, (
+                            (0,int(2 * nx_pad)), (0, int(2 * ny_pad))),
+                                                 'constant',
+                                                 constant_values=0)
+
+
+            elif abs(shift_y) > ny_pad:
+
+                    if shift_y > ny_pad:
+
+                        morph_shift = np.lib.pad(morph, (
+                            (nx_pad + int(shift_x), nx_pad - int(shift_x)), (int(2 * ny_pad), 0)),
+                                                 'constant',
+                                                 constant_values=0)
+                    else:
+                        morph_shift = np.lib.pad(morph, (
+                            (nx_pad + int(shift_x), nx_pad - int(shift_x)), (0, int(2 * ny_pad))),
+                                                 'constant',
+                                                 constant_values=0)
         self.insert1(dict(key,
                           morph_pad = morph_pad,
                           morph_shift = morph_shift,
