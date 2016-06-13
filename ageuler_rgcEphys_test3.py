@@ -183,6 +183,245 @@ class Morph(dj.Computed):
             return fig
 
 @schema
+class Cut(dj.Computed):
+
+    definition="""
+    # Cut soma from Morphology to get DF
+
+    ->Morph
+    ---
+    stack_wos   :longblob
+    dens1       :longblob
+    dens2       :longblob
+    idx_thr1    :longblob
+    idx_thr2    :longblob
+    idx_cut     :int
+    """
+
+    def _make_tuples(self,key):
+
+        stack = (Morph() & key).fetch1['stack'][::-1]
+
+        morph_vert1 = np.mean(stack, 1)
+        morph_vert2 = np.mean(stack, 2)
+
+        ma_vert1 = np.ma.masked_where(morph_vert1 == 0, morph_vert1)
+        ma_vert2 = np.ma.masked_where(morph_vert2 == 0, morph_vert2)
+
+        counts1 = ma_vert1.count(axis=1)
+        dens1 = counts1 / counts1.sum()
+
+        counts2 = ma_vert2.count(axis=1)
+        dens2 = counts2 / counts2.sum()
+
+        idx_thr1 = np.where(dens1 == dens1[dens1 != 0].min())[0]
+        idx_thr2 = np.where(dens2 == dens2[dens2 != 0].min())[0]
+
+        fig_c = self.show_cut(stack,idx_thr1,idx_thr2)
+        display(fig_c)
+        plt.close(fig_c)
+
+        adjust = bool(int(input('Adjust cut off? [Yes:1 , No:0]: ')))
+
+        if adjust:
+            fig_d = self.show_density(dens1,dens2,idx_thr1,idx_thr2)
+            display(fig_d)
+            plt.close(fig_d)
+
+            idx_cut = int(input('Select frame [int] above which everything will be cut off: '))
+
+        else:
+            idx_cut1 = idx_thr1.max()
+            idx_cut2 = idx_thr2.max()
+
+            idx_cut = np.max([idx_cut1, idx_cut2])
+
+        morph = np.mean(stack[0:idx_cut, :, :], 0)
+
+
+
+        self.insert1(dict(key,stack_wos = stack[0:idx_cut,:,:], dens1 = dens1, dens2 = dens2,idx_thr1 = idx_thr1, idx_thr2 = idx_thr2, idx_cut = idx_cut))
+
+    def show_cut(self,stack,idx_thr1,idx_thr2):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2,
+             'lines.linewidth': 1
+             }
+        )
+
+        morph_vert1 = np.mean(stack, 1)
+        morph_vert2 = np.mean(stack, 2)
+
+        idx_cut1 = idx_thr1.max()
+        idx_cut2 = idx_thr2.max()
+
+        with sns.axes_style({'grid.color': 'r'}):
+            fig_cut, ax = plt.subplots(2, 1)
+            clim = (0, .01)
+
+            ax[0].imshow(morph_vert1, clim=clim)
+            ax[0].set_yticks([idx_cut1])
+            ax[0].set_xticks([])
+
+            ax[1].imshow(morph_vert2, clim=clim)
+            ax[1].set_yticks([idx_cut2])
+            ax[1].set_xticks([])
+
+            fig_cut.tight_layout()
+            fig_cut.subplots_adjust(top=.88)
+
+            return fig_cut
+
+    def show_density(self,dens1,dens2,idx_thr1,idx_thr2):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2,
+             'lines.linewidth': 1
+             }
+        )
+
+        cur_pal = sns.current_palette()
+
+        cols1 = [cur_pal[0]] * len(dens1)
+        for i in idx_thr1:
+            cols1[i] = cur_pal[1]
+
+        cols2 = [cur_pal[0]] * len(dens2)
+        for i in idx_thr2:
+            cols2[i] = cur_pal[1]
+
+        width = .8
+        x = np.linspace(0, dens1.shape[0] - width, dens1.shape[0])
+        fig, ax = plt.subplots(1, 2, sharey=True)
+        ax[0].bar(x, dens1, color=cols1)
+        ax[0].set_xlabel('stack height')
+        ax[0].set_ylabel('density of non-zero data points', labelpad=20)
+        ax[0].set_xlim([0,dens1.shape[0]])
+
+        plt.locator_params(axis='y', nbins=4)
+
+        ax[1].bar(x, dens2, color=cols2)
+        ax[1].set_xlabel('stack height')
+        ax[1].set_xlim([0, dens2.shape[0]])
+
+        plt.locator_params(axis='y', nbins=4)
+        fig.tight_layout()
+        fig.subplots_adjust(top=.88)
+
+        return fig
+
+    def plt_cut(self):
+
+        for key in self.project().fetch.as_dict:
+            plt.rcParams.update(
+                {'figure.figsize': (15, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .2,
+                 'lines.linewidth': 1
+                 }
+            )
+            stack = (Morph() & key).fetch1['stack'][::-1]
+            idx_cut = (self & key).fetch1['idx_cut']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
+            morph_vert1 = np.mean(stack, 1)
+            morph_vert2 = np.mean(stack, 2)
+
+            with sns.axes_style({'grid.color': 'r'}):
+                fig_cut, ax = plt.subplots(2, 1)
+                clim = (0, .01)
+
+                ax[0].imshow(morph_vert1, clim=clim)
+                ax[0].set_yticks([idx_cut])
+                ax[0].set_xticks([])
+
+                ax[1].imshow(morph_vert2, clim=clim)
+                ax[1].set_yticks([idx_cut])
+                ax[1].set_xticks([])
+
+                fig_cut.tight_layout()
+                fig_cut.subplots_adjust(top=.88)
+
+                return fig_cut
+
+    def plt_density(self):
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (15, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .2,
+                 'lines.linewidth': 1
+                 }
+            )
+            dens1,dens2 = (self & key).fetch1['dens1','dens2']
+            idx_thr1, idx_thr2 = (self & key).fetch1['idx_thr1','idx_thr2']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
+            cur_pal = sns.current_palette()
+
+            cols1 = [cur_pal[0]] * len(dens1)
+            for i in idx_thr1:
+                cols1[i] = cur_pal[1]
+
+            cols2 = [cur_pal[0]] * len(dens2)
+            for i in idx_thr2:
+                cols2[i] = cur_pal[1]
+
+            width = .8
+            x = np.linspace(0, dens1.shape[0] - width, dens1.shape[0])
+            fig, ax = plt.subplots(1, 2, sharey=True)
+            ax[0].bar(x, dens1, color=cols1)
+            ax[0].set_xlabel('stack height')
+            ax[0].set_ylabel('density of non-zero data points', labelpad=20)
+            ax[0].set_xticks([10, dens1.shape[0] - 10])
+            ax[0].set_xticklabels(['IPL', 'GCL'])
+
+            plt.locator_params(axis='y', nbins=4)
+
+            ax[1].bar(x, dens2, color=cols2)
+            ax[1].set_xlabel('stack height')
+            ax[1].set_xticks([10, dens2.shape[0] - 10])
+            ax[1].set_xticklabels(['IPL', 'GCL'])
+
+            plt.locator_params(axis='y', nbins=4)
+
+            fig.suptitle('Density profile\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            return fig
+
+
+@schema
 class Recording(dj.Manual):
     definition="""
     # Information for a particular recording file
@@ -1334,243 +1573,6 @@ class Overlay(dj.Computed):
 
             return fig
 
-@schema
-class Cut(dj.Computed):
-
-    definition="""
-    # Cut soma from Morphology to get DF
-
-    ->Morph
-    ---
-    stack_wos   :longblob
-    dens1       :longblob
-    dens2       :longblob
-    idx_thr1    :longblob
-    idx_thr2    :longblob
-    idx_cut     :int
-    """
-
-    def _make_tuples(self,key):
-
-        stack = (Morph() & key).fetch1['stack'][::-1]
-
-        morph_vert1 = np.mean(stack, 1)
-        morph_vert2 = np.mean(stack, 2)
-
-        ma_vert1 = np.ma.masked_where(morph_vert1 == 0, morph_vert1)
-        ma_vert2 = np.ma.masked_where(morph_vert2 == 0, morph_vert2)
-
-        counts1 = ma_vert1.count(axis=1)
-        dens1 = counts1 / counts1.sum()
-
-        counts2 = ma_vert2.count(axis=1)
-        dens2 = counts2 / counts2.sum()
-
-        idx_thr1 = np.where(dens1 == dens1[dens1 != 0].min())[0]
-        idx_thr2 = np.where(dens2 == dens2[dens2 != 0].min())[0]
-
-        fig_c = self.show_cut(stack,idx_thr1,idx_thr2)
-        display(fig_c)
-        plt.close(fig_c)
-
-        adjust = bool(int(input('Adjust cut off? [Yes:1 , No:0]: ')))
-
-        if adjust:
-            fig_d = self.show_density(dens1,dens2,idx_thr1,idx_thr2)
-            display(fig_d)
-            plt.close(fig_d)
-
-            idx_cut = int(input('Select frame [int] above which everything will be cut off: '))
-
-        else:
-            idx_cut1 = idx_thr1.max()
-            idx_cut2 = idx_thr2.max()
-
-            idx_cut = np.max([idx_cut1, idx_cut2])
-
-        morph = np.mean(stack[0:idx_cut, :, :], 0)
-
-
-
-        self.insert1(dict(key,stack_wos = stack[0:idx_cut,:,:], dens1 = dens1, dens2 = dens2,idx_thr1 = idx_thr1, idx_thr2 = idx_thr2, idx_cut = idx_cut))
-
-    def show_cut(self,stack,idx_thr1,idx_thr2):
-
-        plt.rcParams.update(
-            {'figure.figsize': (15, 8),
-             'axes.titlesize': 16,
-             'axes.labelsize': 16,
-             'xtick.labelsize': 16,
-             'ytick.labelsize': 16,
-             'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .2,
-             'lines.linewidth': 1
-             }
-        )
-
-        morph_vert1 = np.mean(stack, 1)
-        morph_vert2 = np.mean(stack, 2)
-
-        idx_cut1 = idx_thr1.max()
-        idx_cut2 = idx_thr2.max()
-
-        with sns.axes_style({'grid.color': 'r'}):
-            fig_cut, ax = plt.subplots(2, 1)
-            clim = (0, .01)
-
-            ax[0].imshow(morph_vert1, clim=clim)
-            ax[0].set_yticks([idx_cut1])
-            ax[0].set_xticks([])
-
-            ax[1].imshow(morph_vert2, clim=clim)
-            ax[1].set_yticks([idx_cut2])
-            ax[1].set_xticks([])
-
-            fig_cut.tight_layout()
-            fig_cut.subplots_adjust(top=.88)
-
-            return fig_cut
-
-    def show_density(self,dens1,dens2,idx_thr1,idx_thr2):
-
-        plt.rcParams.update(
-            {'figure.figsize': (15, 8),
-             'axes.titlesize': 16,
-             'axes.labelsize': 16,
-             'xtick.labelsize': 16,
-             'ytick.labelsize': 16,
-             'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .2,
-             'lines.linewidth': 1
-             }
-        )
-
-        cur_pal = sns.current_palette()
-
-        cols1 = [cur_pal[0]] * len(dens1)
-        for i in idx_thr1:
-            cols1[i] = cur_pal[1]
-
-        cols2 = [cur_pal[0]] * len(dens2)
-        for i in idx_thr2:
-            cols2[i] = cur_pal[1]
-
-        width = .8
-        x = np.linspace(0, dens1.shape[0] - width, dens1.shape[0])
-        fig, ax = plt.subplots(1, 2, sharey=True)
-        ax[0].bar(x, dens1, color=cols1)
-        ax[0].set_xlabel('stack height')
-        ax[0].set_ylabel('density of non-zero data points', labelpad=20)
-        ax[0].set_xlim([0,dens1.shape[0]])
-
-        plt.locator_params(axis='y', nbins=4)
-
-        ax[1].bar(x, dens2, color=cols2)
-        ax[1].set_xlabel('stack height')
-        ax[1].set_xlim([0, dens2.shape[0]])
-
-        plt.locator_params(axis='y', nbins=4)
-        fig.tight_layout()
-        fig.subplots_adjust(top=.88)
-
-        return fig
-
-    def plt_cut(self):
-
-        for key in self.project().fetch.as_dict:
-            plt.rcParams.update(
-                {'figure.figsize': (15, 8),
-                 'axes.titlesize': 16,
-                 'axes.labelsize': 16,
-                 'xtick.labelsize': 16,
-                 'ytick.labelsize': 16,
-                 'figure.subplot.hspace': .2,
-                 'figure.subplot.wspace': .2,
-                 'lines.linewidth': 1
-                 }
-            )
-            stack = (Morph() & key).fetch1['stack'][::-1]
-            idx_cut = (self & key).fetch1['idx_cut']
-
-            exp_date = (Experiment() & key).fetch1['exp_date']
-            eye = (Experiment() & key).fetch1['eye']
-            cell_id = (Cell() & key).fetch1['cell_id']
-
-            morph_vert1 = np.mean(stack, 1)
-            morph_vert2 = np.mean(stack, 2)
-
-            with sns.axes_style({'grid.color': 'r'}):
-                fig_cut, ax = plt.subplots(2, 1)
-                clim = (0, .01)
-
-                ax[0].imshow(morph_vert1, clim=clim)
-                ax[0].set_yticks([idx_cut])
-                ax[0].set_xticks([])
-
-                ax[1].imshow(morph_vert2, clim=clim)
-                ax[1].set_yticks([idx_cut])
-                ax[1].set_xticks([])
-
-                fig_cut.tight_layout()
-                fig_cut.subplots_adjust(top=.88)
-
-                return fig_cut
-
-    def plt_density(self):
-
-        for key in self.project().fetch.as_dict:
-
-            plt.rcParams.update(
-                {'figure.figsize': (15, 8),
-                 'axes.titlesize': 16,
-                 'axes.labelsize': 16,
-                 'xtick.labelsize': 16,
-                 'ytick.labelsize': 16,
-                 'figure.subplot.hspace': .2,
-                 'figure.subplot.wspace': .2,
-                 'lines.linewidth': 1
-                 }
-            )
-            dens1,dens2 = (self & key).fetch1['dens1','dens2']
-            idx_thr1, idx_thr2 = (self & key).fetch1['idx_thr1','idx_thr2']
-
-            exp_date = (Experiment() & key).fetch1['exp_date']
-            eye = (Experiment() & key).fetch1['eye']
-            cell_id = (Cell() & key).fetch1['cell_id']
-
-            cur_pal = sns.current_palette()
-
-            cols1 = [cur_pal[0]] * len(dens1)
-            for i in idx_thr1:
-                cols1[i] = cur_pal[1]
-
-            cols2 = [cur_pal[0]] * len(dens2)
-            for i in idx_thr2:
-                cols2[i] = cur_pal[1]
-
-            width = .8
-            x = np.linspace(0, dens1.shape[0] - width, dens1.shape[0])
-            fig, ax = plt.subplots(1, 2, sharey=True)
-            ax[0].bar(x, dens1, color=cols1)
-            ax[0].set_xlabel('stack height')
-            ax[0].set_ylabel('density of non-zero data points', labelpad=20)
-            ax[0].set_xticks([10, dens1.shape[0] - 10])
-            ax[0].set_xticklabels(['IPL', 'GCL'])
-
-            plt.locator_params(axis='y', nbins=4)
-
-            ax[1].bar(x, dens2, color=cols2)
-            ax[1].set_xlabel('stack height')
-            ax[1].set_xticks([10, dens2.shape[0] - 10])
-            ax[1].set_xticklabels(['IPL', 'GCL'])
-
-            plt.locator_params(axis='y', nbins=4)
-
-            fig.suptitle('Density profile\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88)
-
-            return fig
 
 @schema
 class Blur(dj.Computed):
@@ -1671,15 +1673,6 @@ class Blur(dj.Computed):
                           df_z_maxr = blur_df.df[ix_max_r]
                           ))
 
-
-
-
-
-
-
-
-    # @schema
-
     def plt_minres(self):
 
         for key in self.project().fetch.as_dict:
@@ -1703,8 +1696,8 @@ class Blur(dj.Computed):
             sig_minres = (self & key).fetch1['sig_minres']
             sig_maxr = (self & key).fetch1['sig_maxr']
 
-            rf_pad = (Overlay() & key).fetch1['rf_pad']
-            stack_pad = (Overlay() & key).fetch1['stack_shift']
+            rf_pad = (Overlay() & key).fetch1['morph_pad']
+            stack_pad = (Overlay() & key).fetch1['morph_shift']
 
             blur = scimage.gaussian_filter(stack_pad, sigma=.7)
             line_bl = np.ma.masked_where(blur == 0, blur)
