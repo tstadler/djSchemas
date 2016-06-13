@@ -1035,15 +1035,11 @@ class Overlay(dj.Computed):
     -> Morph
     -> STA
     ---
-    stack_pad       :longblob   # morphology padded to rf map size
-    stack_shift     :longblob   # morphology with com shifted onto rf center
+    morph_pad       :longblob   # morphology padded to rf map size
+    morph_shift     :longblob   # morphology with com shifted onto rf center
     rf_pad          :longblob   # receptive field map upsampled to morph resolution
-    gauss_m         :longblob   # parameter set of a 2d gauss fit to the padded morph
-    gauss_m_shift   :longblob   # parameter set of a 2d gauss fit to the padded and shifted morph
-    gauss_rf        :longblob   # parameter set of a 2d gauss fit to the padded rf
-    com_m           :longblob   # center of mass of the padded morph
-    com_m_shift     :longblob   # center of mass of the shifted morph
-    com_rf          :longblob   # center of mass of the rf
+    idx_center      :blob       # tuple with rf center indices
+    idx_soma        :blob       # tuple with com of padded morph
     shift_x         :int        # number of pixels shifted in x dim
     shift_y         :int        # number of pixels shifted in y dim
 
@@ -1075,67 +1071,64 @@ class Overlay(dj.Computed):
 
         rf_pad = scimage.zoom(rf, factor, order=0)
 
+        params_rf = scimage.extrema(rf_pad)
+        (off, on, off_ix, on_ix) = params_rf
+
+        if abs(off) > abs(on):
+            idx_rfcenter = off_ix
+        else:
+            idx_rfcenter = on_ix
+
+        (idx_soma, idy_soma) = scimage.center_of_mass(morph_pad)
+
+        shift_x = int(idx_rfcenter[0] + factor[0] / 2 - int(idx_soma))
+        shift_y = int(idx_rfcenter[1] + factor[1] / 2 - int(idy_soma))
+
         try:
-            try:
-                params_m = self.fitgaussian(morph_pad)
-            except RuntimeWarning as e1:
-                print(e1)
-                params_m = np.array(
-                    [1, morph_pad.shape[0] / 2, morph_pad.shape[1] / 2, morph_pad.shape[0], morph_pad.shape[1]])
-            try:
-                params_rf = self.fitgaussian(np.abs(rf_pad))
-            except RuntimeWarning as e2:
-                print(e2)
-                params_rf = np.array([1, rf_pad.shape[0] / 2, rf_pad.shape[1] / 2, rf_pad.shape[0], rf_pad.shape[1]])
-            (shift_x, shift_y) = (params_rf - params_m)[1:3]
             morph_shift = np.lib.pad(morph, (
                 (nx_pad + int(shift_x), nx_pad - int(shift_x)), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
                                      'constant',
                                      constant_values=0)
-            try:
-                params_m_shift = self.fitgaussian(morph_shift)
-            except RuntimeWarning as e4:
-                print(e4)
-                params_m_shift = np.array(
-                    [1, morph_pad.shape[0] / 2, morph_pad.shape[1] / 2, morph_pad.shape[0], morph_pad.shape[1]])
+        except Exception as e1:
+            print(e1)
+            print('RF borders reached')
 
-            a = morph_pad * np.indices(morph_pad.shape)
-            com_m = np.sum(np.sum(a, axis=1), axis=1) / morph_pad.sum()
+            if abs(shift_x) > nx_pad:
 
-            a = morph_shift * np.indices(morph_shift.shape)
-            com_m_shift = np.sum(np.sum(a, axis=1), axis=1) / morph_shift.sum()
+                if shift_x > nx_pad:
 
-            a = rf_pad * np.indices(rf_pad.shape)
-            com_rf = np.sum(np.sum(a, axis=1), axis=1) / rf_pad.sum()
+                    morph_shift = np.lib.pad(morph, (
+                        (int(2 * nx_pad), 0), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
+                                             'constant',
+                                             constant_values=0)
+                else:
+                    morph_shift = np.lib.pad(morph, (
+                        (0, int(2 * nx_pad)), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
+                                             'constant',
+                                             constant_values=0)
+            if abs(shift_y) > ny_pad:
 
-        except Exception as e3:
-            print(e3)
-            print('Alignment by com')
+                if shift_y > ny_pad:
 
-            a = morph_pad * np.indices(morph_pad.shape)
-            com_m = np.sum(np.sum(a, axis=1), axis=1) / morph_pad.sum()
+                    morph_shift = np.lib.pad(morph, (
+                        (nx_pad + int(shift_x), nx_pad - int(shift_x)), (int(2 * ny_pad), 0)),
+                                             'constant',
+                                             constant_values=0)
+                else:
+                    morph_shift = np.lib.pad(morph, (
+                        (nx_pad + int(shift_x), nx_pad - int(shift_x)), (0, int(2 * ny_pad))),
+                                             'constant',
+                                             constant_values=0)
+        self.insert1(dict(key,
+                          morph_pad = morph_pad,
+                          morph_shift = morph_shift,
+                          rf_pad = rf_pad,
+                          idx_center = idx_rfcenter,
+                          idx_soma = (int(idx_soma),int(idy_soma)),
+                          shift_x = int(shift_x),
+                          shift_y = int(shift_y)
+                          ))
 
-            a = np.abs(rf_pad) * np.indices(rf_pad.shape)
-            com_rf = np.sum(np.sum(a, axis=1), axis=1) / np.abs(rf_pad).sum()
-
-            (shift_x, shift_y) = (com_rf - com_m)
-            morph_shift = np.lib.pad(morph, (
-                (nx_pad + int(shift_x), nx_pad - int(shift_x)), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
-                                     'constant',
-                                     constant_values=0)
-            try:
-                params_m_shift = self.fitgaussian(morph_shift)
-            except RuntimeWarning as e4:
-                print(e4)
-                params_m_shift = np.array(
-                    [1, morph_pad.shape[0] / 2, morph_pad.shape[1] / 2, morph_pad.shape[0], morph_pad.shape[1]])
-
-            a = morph_shift * np.indices(morph_shift.shape)
-            com_m_shift = np.sum(np.sum(a, axis=1), axis=1) / morph_shift.sum()
-
-        self.insert1(dict(key, stack_pad = morph_pad,stack_shift = morph_shift, rf_pad = rf_pad,
-                          gauss_m = params_m, gauss_m_shift = params_m_shift,gauss_rf = params_rf,
-                          com_m = com_m,com_m_shift = com_m_shift,com_rf = com_rf, shift_x = int(shift_x), shift_y=int(shift_y)))
 
     def gaussian(self,height, mu_x, mu_y, sd_x, sd_y):
             """Returns a gaussian function with the given parameters"""
@@ -1182,8 +1175,8 @@ class Overlay(dj.Computed):
                  }
             )
 
-            morph_pad = (self & key).fetch1['stack_pad']
-            morph_shift = (self & key).fetch1['stack_shift']
+            morph_pad = (self & key).fetch1['morph_pad']
+            morph_shift = (self & key).fetch1['morph_shift']
             rf_pad = (self & key).fetch1['rf_pad']
             (shift_x, shift_y) = (self & key).fetch1['shift_x', 'shift_y']
             (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
@@ -1222,80 +1215,80 @@ class Overlay(dj.Computed):
 
             return fig
 
-    def overlay_gauss(self):
-
-        for key in self.project().fetch.as_dict:
-
-            plt.rcParams.update(
-                {'figure.figsize': (12, 8),
-                 'axes.titlesize': 16,
-                 'axes.labelsize': 16,
-                 'xtick.labelsize': 16,
-                 'ytick.labelsize': 16,
-                 'figure.subplot.hspace': .2,
-                 'figure.subplot.wspace': .3,
-                 'lines.linewidth':1
-                 }
-            )
-
-            morph_pad = (self & key).fetch1['stack_pad']
-            morph_shift = (self & key).fetch1['stack_shift']
-            rf_pad = (self & key).fetch1['rf_pad']
-            (shift_x, shift_y) = (self & key).fetch1['shift_x', 'shift_y']
-            params_m, params_m_shift, params_rf = (self & key).fetch1['gauss_m','gauss_m_shift','gauss_rf']
-
-            (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
-            (df_size_x,df_size_y) = (Morph() & key).fetch1['df_size_x','df_size_y']
-
-            exp_date = (Experiment() & key).fetch1['exp_date']
-            eye = (Experiment() & key).fetch1['eye']
-            cell_id = (Cell() & key).fetch1['cell_id']
-
-            rf_size_x = 2*params_rf[3]*dx_morph
-            rf_size_y = 2*params_rf[4]*dy_morph
-
-            line_pad = np.ma.masked_where(morph_pad == 0, morph_pad)
-            line_shift = np.ma.masked_where(morph_shift == 0, morph_shift)
-
-            fit_m_pad = self.gaussian(*params_m)
-            fit_rf_pad = self.gaussian(*params_rf)
-            fit_m_shift = self.gaussian(*params_m_shift)
-
-            clim = (0,1)
-
-            fig, ax = plt.subplots(1, 2)
-            ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
-            ax[0].imshow(line_pad, cmap=plt.cm.gray, clim=clim)
-            ax[0].contour(fit_m_pad(*np.indices(morph_pad.shape)), cmap=plt.cm.Greens, linewidth=1)
-            ax[0].contour(fit_rf_pad(*np.indices(rf_pad.shape)), cmap=plt.cm.Purples, linewidth=1)
-
-            ax[0].set_xticklabels([])
-            ax[0].set_yticklabels([])
-            ax[0].set_title('original')
-            ax[0].annotate('rf 2 s.d. in x [um]: %.2f \nrf 2 s.d. in y [um]: %.2f' % (rf_size_x, rf_size_y),
-                              xy=(20, 150), fontsize=14)
-
-
-            ax[1].imshow(rf_pad, cmap=plt.cm.coolwarm)
-            ax[1].imshow(line_shift, cmap=plt.cm.gray, clim=clim)
-            ax[1].contour(fit_m_shift(*np.indices(morph_pad.shape)), cmap=plt.cm.Greens, linewidth=1)
-            ax[1].contour(fit_rf_pad(*np.indices(rf_pad.shape)), cmap=plt.cm.Purples, linewidth=1)
-
-            dx_mu = shift_x * dx_morph
-            dy_mu = shift_y * dy_morph
-
-            ax[1].set_xticklabels([])
-            ax[1].set_yticklabels([])
-            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu))
-            ax[1].annotate('df size in x [um]: %.2f\ndf size in y [um]: %.2f' % (df_size_x, df_size_y), xy=(20, 150),
-                           fontsize=14)
-
-            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
-
-            plt.tight_layout()
-            plt.subplots_adjust(top=.8)
-
-            return fig
+    # def overlay_gauss(self):
+    #
+    #     for key in self.project().fetch.as_dict:
+    #
+    #         plt.rcParams.update(
+    #             {'figure.figsize': (12, 8),
+    #              'axes.titlesize': 16,
+    #              'axes.labelsize': 16,
+    #              'xtick.labelsize': 16,
+    #              'ytick.labelsize': 16,
+    #              'figure.subplot.hspace': .2,
+    #              'figure.subplot.wspace': .3,
+    #              'lines.linewidth':1
+    #              }
+    #         )
+    #
+    #         morph_pad = (self & key).fetch1['stack_pad']
+    #         morph_shift = (self & key).fetch1['stack_shift']
+    #         rf_pad = (self & key).fetch1['rf_pad']
+    #         (shift_x, shift_y) = (self & key).fetch1['shift_x', 'shift_y']
+    #         params_m, params_m_shift, params_rf = (self & key).fetch1['gauss_m','gauss_m_shift','gauss_rf']
+    #
+    #         (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
+    #         (df_size_x,df_size_y) = (Morph() & key).fetch1['df_size_x','df_size_y']
+    #
+    #         exp_date = (Experiment() & key).fetch1['exp_date']
+    #         eye = (Experiment() & key).fetch1['eye']
+    #         cell_id = (Cell() & key).fetch1['cell_id']
+    #
+    #         rf_size_x = 2*params_rf[3]*dx_morph
+    #         rf_size_y = 2*params_rf[4]*dy_morph
+    #
+    #         line_pad = np.ma.masked_where(morph_pad == 0, morph_pad)
+    #         line_shift = np.ma.masked_where(morph_shift == 0, morph_shift)
+    #
+    #         fit_m_pad = self.gaussian(*params_m)
+    #         fit_rf_pad = self.gaussian(*params_rf)
+    #         fit_m_shift = self.gaussian(*params_m_shift)
+    #
+    #         clim = (0,1)
+    #
+    #         fig, ax = plt.subplots(1, 2)
+    #         ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
+    #         ax[0].imshow(line_pad, cmap=plt.cm.gray, clim=clim)
+    #         ax[0].contour(fit_m_pad(*np.indices(morph_pad.shape)), cmap=plt.cm.Greens, linewidth=1)
+    #         ax[0].contour(fit_rf_pad(*np.indices(rf_pad.shape)), cmap=plt.cm.Purples, linewidth=1)
+    #
+    #         ax[0].set_xticklabels([])
+    #         ax[0].set_yticklabels([])
+    #         ax[0].set_title('original')
+    #         ax[0].annotate('rf 2 s.d. in x [um]: %.2f \nrf 2 s.d. in y [um]: %.2f' % (rf_size_x, rf_size_y),
+    #                           xy=(20, 150), fontsize=14)
+    #
+    #
+    #         ax[1].imshow(rf_pad, cmap=plt.cm.coolwarm)
+    #         ax[1].imshow(line_shift, cmap=plt.cm.gray, clim=clim)
+    #         ax[1].contour(fit_m_shift(*np.indices(morph_pad.shape)), cmap=plt.cm.Greens, linewidth=1)
+    #         ax[1].contour(fit_rf_pad(*np.indices(rf_pad.shape)), cmap=plt.cm.Purples, linewidth=1)
+    #
+    #         dx_mu = shift_x * dx_morph
+    #         dy_mu = shift_y * dy_morph
+    #
+    #         ax[1].set_xticklabels([])
+    #         ax[1].set_yticklabels([])
+    #         ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu))
+    #         ax[1].annotate('df size in x [um]: %.2f\ndf size in y [um]: %.2f' % (df_size_x, df_size_y), xy=(20, 150),
+    #                        fontsize=14)
+    #
+    #         plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+    #
+    #         plt.tight_layout()
+    #         plt.subplots_adjust(top=.8)
+    #
+    #         return fig
 
 @schema
 class Cut(dj.Computed):
