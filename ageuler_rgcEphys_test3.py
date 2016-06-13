@@ -1047,7 +1047,7 @@ class Overlay(dj.Computed):
 
     def _make_tuples(self,key):
 
-        stack = (Morph() & key).fetch1['stack']
+        stack = (Cut() & key).fetch1['stack_wos']
         (scan_z, scan_x, scan_y) = (Morph() & key).fetch1['scan_z', 'scan_x', 'scan_y']
         zoom = (Morph() & key).fetch1['zoom']
         scan_size = (Morph() & key).fetch1['scan_size']
