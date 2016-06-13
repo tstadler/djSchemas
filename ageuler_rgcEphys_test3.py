@@ -1696,7 +1696,7 @@ class Blur(dj.Computed):
             sig_minres = (self & key).fetch1['sig_minres']
             sig_maxr = (self & key).fetch1['sig_maxr']
 
-            rf_pad = (Overlay() & key).fetch1['morph_pad']
+            rf_pad = (Overlay() & key).fetch1['rf_pad']
             stack_pad = (Overlay() & key).fetch1['morph_shift']
 
             blur = scimage.gaussian_filter(stack_pad, sigma=.7)
