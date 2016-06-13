@@ -1316,7 +1316,7 @@ class Overlay(dj.Computed):
             fig, ax = plt.subplots(1, 2)
 
             ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
-            ax[0].scatter(idx_rfcenter[1] + int(factor[1] / 2), idx_rfcenter[0] + int(factor[0] / 2), marker='x', s=100,
+            ax[0].scatter(idx_rfcenter[0][1] + int(factor[1] / 2), idx_rfcenter[0][0] + int(factor[0] / 2), marker='x', s=100,
                           linewidth=3, color='k', label='max|w|')
 
             ax[0].set_xticklabels([])
