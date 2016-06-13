@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.ndimage as scimage
 import scipy.signal as scignal
+import scipy.misc as scmisc
 from IPython.display import display
 from matplotlib import ticker
 import tifffile as tf
@@ -955,6 +956,7 @@ class STA(dj.Computed):
                  }
             )
 
+            cur_pal = sns.color_palette()
 
             rf = (self & key).fetch1['rf']
             tau = (self & key).fetch1['tau']
@@ -985,9 +987,9 @@ class STA(dj.Computed):
             deltat = 1000  # in ms
             t = np.linspace(100, -deltat, len(kernel))
             if np.sign(np.mean(kernel)) == -1:
-                plt.plot(t, kernel, color='b',linewidth=4)
+                plt.plot(t, kernel, color=cur_pal[0],linewidth=4)
             else:
-                plt.plot(t, kernel, color='r',linewidth=4)
+                plt.plot(t, kernel, color=cur_pal[2],linewidth=4)
 
             plt.locator_params(axis='y', nbins=4)
             ax = fig.gca()
@@ -1298,7 +1300,7 @@ class Overlay(dj.Computed):
 class Cut(dj.Computed):
 
     definition="""
-    # Blur RF and calc correlation with rf
+    # Cut soma from Morphology to get DF
 
     ->Morph
     ---
@@ -1533,138 +1535,245 @@ class Cut(dj.Computed):
             return fig
 
 @schema
-class LnpExp(dj.Computed):
+class Blur(dj.Computed):
 
     definition="""
-    # Fit a RF under a LNP model with exponential non-linearity
-    -> STA
+    -> Overlay
     ---
-    frames_conv : longblob   # stimulus frames convolved with time kernel in steps of 200 ms
-    sta_inst    : longblob   # instantaneous rf obtained by convolution of STA with the time kernel from svd
-    rf          : longblob   # fited rf with best negative log-likelihood on the test set
-    pred        : double     # percentage of time bins where number of spikes was predicted correctly on test set
-    pears_r     : double     # Pearson's correlation coefficient between predicted and true psth on test set
-    r2          : double     # fraction variance explained on test set
-    pred_psth   : longblob   # array (1 x T_test) predicted psth with time bins of 200ms on the test set
-    true_psth   : longblob   # array (1 x T_test) spiketimes vector binned by 200 ms with length of test set
-
+    min_res         : double    # minimum total residual sum, per pixel
+    sig_minres      : double    # blurring filter size with which min residual was observed
+    max_r           : double    # maximum correlation with rf
+    sig_maxr        : double    # blurring filter size with which max correlation was observed
+    rf_z            : longblob  # normalized rf
+    df_z_minres     : longblob  # normalized, blurred df
+    df_z_maxr       : longblob  # normalized, blurred df
     """
+
 
     def _make_tuples(self,key):
 
-        u = (STA() & key).fetch1['u']
+        stack = (Cut() & key).fetch1['stack_wos']
+        (scan_z, scan_x, scan_y) = (Morph() & key).fetch1['scan_z', 'scan_x', 'scan_y']
+        zoom = (Morph() & key).fetch1['zoom']
+        scan_size = (Morph() & key).fetch1['scan_size']
+        (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
 
-        stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x', 'stim_dim_y']
-        Frames = (BWNoiseFrames() & key).fetch1['frames']
+        shift_x, shift_y = (Overlay() & key).fetch1['shift_x', 'shift_y']
+        (dx, dy) = (BWNoise() & key).fetch1['delx', 'dely']
+        rf = (STA() & key).fetch1['rf']
 
-        freq = (BWNoise() & key).fetch1['freq']
+        morph = np.mean(stack, 0)
 
-        fs = (Recording() & key).fetch1['fs']
+        dely = (rf.shape[1] * dy - scan_size) / 2  # missing at each side of stack to fill stimulus in um
+        delx = (rf.shape[0] * dx - scan_size) / 2
 
-        spiketimes = (Spikes() & key).fetch1['spiketimes']
-        rec_len = (Spikes() & key).fetch1['rec_len']
-        triggertimes = (Trigger() & key).fetch1['triggertimes']
+        ny_pad = int(dely / dy_morph)  # number of pixels needed to fill the gap
+        nx_pad = int(delx / dx_morph)
 
+        morph_pad = np.lib.pad(morph, ((nx_pad + shift_x, nx_pad - shift_x), (ny_pad + shift_y, ny_pad - shift_y)),
+                               'constant', constant_values=0)
 
+        # Normalize RF
 
-        k = u[::20]  # in time steps of 200 ms which corresponds to stimulation frequency of 5 Hz
-        k_pad = np.vstack(
-            (np.zeros(k[:, None].shape), k[:, None]))  # zero-padding to shift origin of weights vector accordingly
+        b = np.mean(rf[0, :])
+        peak = abs(rf).max()
+        rf_z = (rf - b) / peak
 
-        s_conv = scimage.filters.convolve(Frames, k_pad)
+        # Blur
+        sig = np.arange(0, 100, 10)
+        blur = {}
+        blur.clear()
+        blur['blur'] = []
+        blur['sigma'] = []
 
-        stimInd = np.zeros([rec_len, 1]).astype(int) - 1
+        for s in sig:
+            blur['blur'].append(scimage.gaussian_filter(morph_pad, sigma=s))  # blur
+            blur['sigma'].append(s)
 
-        for n in range(len(triggertimes) - 1):
-            stimInd[triggertimes[n]:triggertimes[n + 1] - 1] += int(n + 1)
-        stimInd[triggertimes[len(triggertimes) - 1]:triggertimes[len(triggertimes) - 1] + (fs / freq)] += int(
-            len(triggertimes))
+        blur_df = pd.DataFrame(blur)
 
-        spiketimes = spiketimes[spiketimes > triggertimes[0]]
-        spiketimes = spiketimes[spiketimes < triggertimes[len(triggertimes) - 1] + (fs / freq)]
-        nspiketimes = len(spiketimes)
+        df_nz = []
+        for ix, row in blur_df.iterrows():
+            df_nz.append(scmisc.imresize(row.blur, rf.shape, interp='bicubic'))  # down-sample
 
-        ste = np.zeros([nspiketimes, stimDim[0] * stimDim[1]])
+        blur_df = blur_df.assign(df_nz=df_nz)
 
-        for s in range(nspiketimes):
-            ste[s, :] = s_conv[stimInd[spiketimes[s]], :]
+        df_z = []
+        res = []
+        res_n = []
+        res_sum = []
+        r = []
 
-        sta_inst = np.mean(ste, 0)
+        for ix, row in blur_df.iterrows():
+            if abs(rf_z.min()) > abs(rf_z.max()):
+                df_z.append(-(row.df_nz / abs(row.df_nz).max()))
+            else:
+                df_z.append((row.df_nz / abs(row.df_nz).max()))
+            res.append(df_z[ix] - rf_z)
+            res_n.append(res[ix] / abs(res[ix]).max())
+            res_sum.append(abs(res[ix]).sum() / len(rf.flatten()))
+            r.append(np.corrcoef(df_z[ix].flatten(), rf_z.flatten())[0, 1])
 
-        s = np.transpose(s_conv)  # make it a (n x T) array
-        T = s.shape[1]
+        blur_df = blur_df.assign(df=df_z)
+        blur_df = blur_df.assign(res=res)
+        blur_df = blur_df.assign(res_n=res_n)
+        blur_df = blur_df.assign(res_sum=res_sum)
+        blur_df = blur_df.assign(r=r)
 
-        # bin spiketimes in 200ms time bins
-        y = np.histogram(spiketimes, bins=T,
-                         range=[triggertimes[0], triggertimes[len(triggertimes) - 1] + (fs / freq)])[0]
-        LNP_dict = {}
-        LNP_dict.clear()
-        LNP_dict['nLL train'] = []
-        LNP_dict['nLL test'] = []
-        LNP_dict['w'] = []
-        LNP_dict['pred correct'] = []
-        LNP_dict['pearson r'] = []
-        LNP_dict['R2'] = []
-        LNP_dict['pred psth'] = []
-        LNP_dict['true psth'] = []
+        ix_min_res = blur_df.res_sum.idxmin()
+        ix_max_r = blur_df.r.idxmax()
 
-        w0 = np.zeros(s.shape[0])
-        k= 6
-        kf = KFold(T, n_folds=k)
-
-        for train, test in kf:
-            res = scoptimize.minimize(self.nll_exp, w0, args=(s[:, train], y[train]), jac=True, method='TNC')
-            print(res.message, 'neg log-liklhd: ', res.fun)
-
-            LNP_dict['nLL train'].append(res.fun)
-            LNP_dict['nLL test'].append(self.nll_exp(res.x, s[:, test], y[test])[0])
-            LNP_dict['w'].append(res.x)
-
-            y_test = np.zeros(len(test))
-            for t in range(len(test)):
-                r = np.exp(np.dot(res.x, s[:, test[t]]))
-                y_test[t] = np.random.poisson(lam=r)
-
-            LNP_dict['pred correct'].append((sum(y_test == y[test]) / len(test)))
-            LNP_dict['pearson r'].append(scstats.pearsonr(y_test, y[test])[0])
-            LNP_dict['R2'].append(1 - np.sum(np.square(y[test] - y_test)) / np.sum(np.square(y[test] - np.mean(y[test]))))
-            LNP_dict['pred psth'].append(y_test * freq)
-            LNP_dict['true psth'].append(y[test] * freq)
-        LNP_df = pd.DataFrame(LNP_dict)
-
-        idx = LNP_df['nLL test'].idxmin()
-        print('idx: ', idx)
-        print(LNP_df['w'][idx].shape)
-
-        self.insert1(dict(key,frames_conv = s_conv,
-                          sta_inst = sta_inst,
-                          rf = LNP_df['w'][idx],
-                          pred = LNP_df['pred correct'][idx],
-                          pears_r = LNP_df['pearson r'][idx],
-                          r2  = LNP_df['R2'][idx],
-                          pred_psth = LNP_df['pred psth'][idx],
-                          true_psth = LNP_df['true psth'][idx]
+        self.insert1(dict(key,
+                          min_res = blur_df.res_sum.min(),
+                          sig_minres = blur_df.sigma[ix_min_res],
+                          sig_maxr = blur_df.sigma[ix_max_r],
+                          max_r = blur_df.r.max(),
+                          rf_z = rf_z,
+                          df_z_minres = blur_df.df[ix_min_res],
+                          df_z_maxr = blur_df.df[ix_max_r]
                           ))
 
-    def nll_exp(self,wT,s,y):
 
-        """
-            Compute the negative log-likelihood of an LNP model wih exponential non-linearity
 
-            :arg wT: current receptive field array(stimDim[0]*stimDim[1],)
-            :arg s: stimulus array(stimDim[0]*stimDim[1],T)
-            :arg y: spiketimes array(,T)
 
-            :return nLL: computed negative log-likelihood scalar
-            :return dnLL: computed first derivative of the nLL
-            """
 
-        r = np.exp(np.dot(wT, s))
-        nLL = np.dot(r - y * np.log(r), np.ones(y.shape))
 
-        dnLL = np.dot(s * r - y * s, np.ones(y.shape))
 
-        return nLL, dnLL
+
+    # @schema
+# class LnpExp(dj.Computed):
+#
+#     definition="""
+#     # Fit a RF under a LNP model with exponential non-linearity
+#     -> STA
+#     ---
+#     frames_conv : longblob   # stimulus frames convolved with time kernel in steps of 200 ms
+#     sta_inst    : longblob   # instantaneous rf obtained by convolution of STA with the time kernel from svd
+#     rf          : longblob   # fited rf with best negative log-likelihood on the test set
+#     pred        : double     # percentage of time bins where number of spikes was predicted correctly on test set
+#     pears_r     : double     # Pearson's correlation coefficient between predicted and true psth on test set
+#     r2          : double     # fraction variance explained on test set
+#     pred_psth   : longblob   # array (1 x T_test) predicted psth with time bins of 200ms on the test set
+#     true_psth   : longblob   # array (1 x T_test) spiketimes vector binned by 200 ms with length of test set
+#
+#     """
+#
+#     def _make_tuples(self,key):
+#
+#         u = (STA() & key).fetch1['u']
+#
+#         stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x', 'stim_dim_y']
+#         Frames = (BWNoiseFrames() & key).fetch1['frames']
+#
+#         freq = (BWNoise() & key).fetch1['freq']
+#
+#         fs = (Recording() & key).fetch1['fs']
+#
+#         spiketimes = (Spikes() & key).fetch1['spiketimes']
+#         rec_len = (Spikes() & key).fetch1['rec_len']
+#         triggertimes = (Trigger() & key).fetch1['triggertimes']
+#
+#
+#
+#         k = u[::20]  # in time steps of 200 ms which corresponds to stimulation frequency of 5 Hz
+#         k_pad = np.vstack(
+#             (np.zeros(k[:, None].shape), k[:, None]))  # zero-padding to shift origin of weights vector accordingly
+#
+#         s_conv = scimage.filters.convolve(Frames, k_pad)
+#
+#         stimInd = np.zeros([rec_len, 1]).astype(int) - 1
+#
+#         for n in range(len(triggertimes) - 1):
+#             stimInd[triggertimes[n]:triggertimes[n + 1] - 1] += int(n + 1)
+#         stimInd[triggertimes[len(triggertimes) - 1]:triggertimes[len(triggertimes) - 1] + (fs / freq)] += int(
+#             len(triggertimes))
+#
+#         spiketimes = spiketimes[spiketimes > triggertimes[0]]
+#         spiketimes = spiketimes[spiketimes < triggertimes[len(triggertimes) - 1] + (fs / freq)]
+#         nspiketimes = len(spiketimes)
+#
+#         ste = np.zeros([nspiketimes, stimDim[0] * stimDim[1]])
+#
+#         for s in range(nspiketimes):
+#             ste[s, :] = s_conv[stimInd[spiketimes[s]], :]
+#
+#         sta_inst = np.mean(ste, 0)
+#
+#         s = np.transpose(s_conv)  # make it a (n x T) array
+#         T = s.shape[1]
+#
+#         # bin spiketimes in 200ms time bins
+#         y = np.histogram(spiketimes, bins=T,
+#                          range=[triggertimes[0], triggertimes[len(triggertimes) - 1] + (fs / freq)])[0]
+#         LNP_dict = {}
+#         LNP_dict.clear()
+#         LNP_dict['nLL train'] = []
+#         LNP_dict['nLL test'] = []
+#         LNP_dict['w'] = []
+#         LNP_dict['pred correct'] = []
+#         LNP_dict['pearson r'] = []
+#         LNP_dict['R2'] = []
+#         LNP_dict['pred psth'] = []
+#         LNP_dict['true psth'] = []
+#
+#         w0 = np.zeros(s.shape[0])
+#         k= 6
+#         kf = KFold(T, n_folds=k)
+#
+#         for train, test in kf:
+#             res = scoptimize.minimize(self.nll_exp, w0, args=(s[:, train], y[train]), jac=True, method='TNC')
+#             print(res.message, 'neg log-liklhd: ', res.fun)
+#
+#             LNP_dict['nLL train'].append(res.fun)
+#             LNP_dict['nLL test'].append(self.nll_exp(res.x, s[:, test], y[test])[0])
+#             LNP_dict['w'].append(res.x)
+#
+#             y_test = np.zeros(len(test))
+#             for t in range(len(test)):
+#                 r = np.exp(np.dot(res.x, s[:, test[t]]))
+#                 y_test[t] = np.random.poisson(lam=r)
+#
+#             LNP_dict['pred correct'].append((sum(y_test == y[test]) / len(test)))
+#             LNP_dict['pearson r'].append(scstats.pearsonr(y_test, y[test])[0])
+#             LNP_dict['R2'].append(1 - np.sum(np.square(y[test] - y_test)) / np.sum(np.square(y[test] - np.mean(y[test]))))
+#             LNP_dict['pred psth'].append(y_test * freq)
+#             LNP_dict['true psth'].append(y[test] * freq)
+#         LNP_df = pd.DataFrame(LNP_dict)
+#
+#         idx = LNP_df['nLL test'].idxmin()
+#         print('idx: ', idx)
+#         print(LNP_df['w'][idx].shape)
+#         print(LNP_df['true psth'].shape)
+#
+#         self.insert1(dict(key,frames_conv = s_conv,
+#                           sta_inst = sta_inst,
+#                           rf = LNP_df['w'][idx],
+#                           pred = LNP_df['pred correct'][idx],
+#                           pears_r = LNP_df['pearson r'][idx],
+#                           r2  = LNP_df['R2'][idx],
+#                           pred_psth = LNP_df['pred psth'][idx],
+#                           true_psth = LNP_df['true psth'][idx]
+#                           ))
+#
+#     def nll_exp(self,wT,s,y):
+#
+#         """
+#             Compute the negative log-likelihood of an LNP model wih exponential non-linearity
+#
+#             :arg wT: current receptive field array(stimDim[0]*stimDim[1],)
+#             :arg s: stimulus array(stimDim[0]*stimDim[1],T)
+#             :arg y: spiketimes array(,T)
+#
+#             :return nLL: computed negative log-likelihood scalar
+#             :return dnLL: computed first derivative of the nLL
+#             """
+#
+#         r = np.exp(np.dot(wT, s))
+#         nLL = np.dot(r - y * np.log(r), np.ones(y.shape))
+#
+#         dnLL = np.dot(s * r - y * s, np.ones(y.shape))
+#
+#         return nLL, dnLL
 
 
 @schema
