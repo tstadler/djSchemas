@@ -1290,6 +1290,50 @@ class Overlay(dj.Computed):
     #
     #         return fig
 
+    def center(self):
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (12, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .3
+                 }
+            )
+
+            rf_pad = (self & key).fetch1['rf_pad']
+            morph_pad = (self & key).fetch1['morph_pad']
+            idx_rfcenter = (self & key).fetch1['idx_rfcenter']
+            idx_soma = (self & key).fetch1['idx_soma']
+            stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x','stim_dim_y']
+
+            factor = (morph_pad.shape[0]/stimDim[0],morph_pad.shape[1]/stimDim[1])
+
+            fig, ax = plt.subplots(1, 2)
+
+            ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
+            ax[0].scatter(idx_rfcenter[1] + int(factor[1] / 2), idx_rfcenter[0] + int(factor[0] / 2), marker='x', s=100,
+                          linewidth=3, color='k', label='max|w|')
+
+            ax[0].set_xticklabels([])
+            ax[0].set_yticklabels([])
+            ax[0].set_title('Receptive Field')
+            ax[0].legend()
+
+            ax[1].imshow(morph_pad, clim=(0, .01))
+            ax[1].scatter(idx_soma[1], idx_soma[0], marker='x', s=100, linewidth=3, color='b', label='com')
+
+            ax[1].set_xticklabels([])
+            ax[1].set_yticklabels([])
+            ax[1].set_title('Dendritic Field')
+            ax[1].legend()
+
+            return fig
+
 @schema
 class Cut(dj.Computed):
 
