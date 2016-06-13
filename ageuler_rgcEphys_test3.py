@@ -1307,7 +1307,7 @@ class Overlay(dj.Computed):
 
             rf_pad = (self & key).fetch1['rf_pad']
             morph_pad = (self & key).fetch1['morph_pad']
-            idx_rfcenter = (self & key).fetch1['idx_rfcenter']
+            idx_rfcenter = (self & key).fetch1['idx_center']
             idx_soma = (self & key).fetch1['idx_soma']
             stimDim = (BWNoiseFrames() & key).fetch1['stim_dim_x','stim_dim_y']
 
