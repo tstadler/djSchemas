@@ -1661,8 +1661,8 @@ class Blur(dj.Computed):
             df_minres = (self & key).fetch1['df_z_minres']
             df_maxr = (self & key).fetch1['df_z_maxr']
             rf_z = (self & key).fetch1['rf_z']
-            minres = (self & key).fetch1['minres']
-            maxr = (self & key).fetch1['maxr']
+            minres = (self & key).fetch1['min_res']
+            maxr = (self & key).fetch1['max_r']
             sig_minres = (self & key).fetch1['sig_minres']
             sig_maxr = (self & key).fetch1['sig_maxr']
 
@@ -1737,6 +1737,8 @@ class Blur(dj.Computed):
 
 
             return fig
+
+
 # class LnpExp(dj.Computed):
 #
 #     definition="""
