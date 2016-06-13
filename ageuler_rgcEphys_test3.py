@@ -1619,26 +1619,9 @@ class Blur(dj.Computed):
 
     def _make_tuples(self,key):
 
-        stack = (Cut() & key).fetch1['stack_wos']
-        (scan_z, scan_x, scan_y) = (Morph() & key).fetch1['scan_z', 'scan_x', 'scan_y']
-        zoom = (Morph() & key).fetch1['zoom']
-        scan_size = (Morph() & key).fetch1['scan_size']
-        (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
+        morph_pad = (Overlay() & key).fetch1['morph_shift'] # shifted and w/o soma
 
-        shift_x, shift_y = (Overlay() & key).fetch1['shift_x', 'shift_y']
-        (dx, dy) = (BWNoise() & key).fetch1['delx', 'dely']
         rf = (STA() & key).fetch1['rf']
-
-        morph = np.mean(stack, 0)
-
-        dely = (rf.shape[1] * dy - scan_size) / 2  # missing at each side of stack to fill stimulus in um
-        delx = (rf.shape[0] * dx - scan_size) / 2
-
-        ny_pad = int(dely / dy_morph)  # number of pixels needed to fill the gap
-        nx_pad = int(delx / dx_morph)
-
-        morph_pad = np.lib.pad(morph, ((nx_pad + shift_x, nx_pad - shift_x), (ny_pad + shift_y, ny_pad - shift_y)),
-                               'constant', constant_values=0)
 
         # Normalize RF
 
