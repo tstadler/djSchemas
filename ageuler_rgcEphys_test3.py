@@ -845,6 +845,63 @@ class Trigger(dj.Computed):
         # insert
         self.insert1(dict(key, triggertimes=triggertimes))
 
+    def plt_rawtrace(self):
+
+        start = int(input('Plot trigger trace from (in s): '))
+        end = int(input('to (in s): '))
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (14, 7),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .2,
+                 'lines.linewidth': 2
+                 }
+            )
+
+            fname = key['filename']
+
+            fs = (Recording() & key).fetch1['fs']
+            ch_voltage, ch_trigger = (Recording() & key).fetch1['ch_voltage', 'ch_trigger']
+
+            cell_path = (Cell() & key).fetch1['folder']
+            exp_path = (Experiment() & key).fetch1['path']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            full_path = exp_path + cell_path + fname + '.h5'
+            f = h5py.File(full_path, 'r')
+            ch_grp = f[ch_trigger]
+            keylist = [key for key in ch_grp.keys()]  # get key within one group
+            trigger_trace = ch_grp[keylist[1]]['data'][:]  # initialize as section_00
+
+            for sec in range(2, len(keylist)):
+                ch_sec_tmp = ch_grp[keylist[sec]]
+                dset = ch_sec_tmp['data'][:]  # get array
+                trigger_trace = np.append(trigger_trace, dset)
+
+            x = np.linspace(start, end, (end - start) * fs)
+
+            fig, ax = plt.subplots()
+
+            plt.suptitle(str(exp_date) + ': ' + eye + ': ' + fname, fontsize=18)
+
+            ax.plot(x, trigger_trace[start * fs:end * fs], linewidth=2)
+            ax.set_ylabel('Trigger [mV]', labelpad=20)
+            ax.set_xlabel('Time [s]', labelpad=20)
+            ax.set_xlim([start, end])
+            plt.locator_params(axis='y', nbins=5)
+
+            plt.tight_layout()
+            plt.subplots_adjust(top=.8)
+
+            return fig
+
 @schema
 class BWNoise(dj.Computed):
     definition="""
@@ -1271,7 +1328,7 @@ class Overlay(dj.Computed):
     definition="""
     # Overlay of linestack and receptive field map
 
-    -> Morph
+    -> Cut
     -> STA
     ---
     morph_pad       :longblob   # morphology padded to rf map size
