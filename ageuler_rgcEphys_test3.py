@@ -1348,7 +1348,7 @@ class STA(dj.Computed):
             fig.add_subplot(2, 2, 2)
             deltat = 1000  # in ms
             t = np.linspace(100, -deltat, len(kernel))
-            if abs(kernel.min()) > abs(kernel.max()) == -1:
+            if abs(kernel.min()) > abs(kernel.max()):
                 plt.plot(t, kernel, color=cur_pal[0],linewidth=4)
             else:
                 plt.plot(t, kernel, color=cur_pal[2],linewidth=4)
