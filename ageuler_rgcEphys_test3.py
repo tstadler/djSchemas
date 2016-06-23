@@ -1348,7 +1348,7 @@ class STA(dj.Computed):
             fig.add_subplot(2, 2, 2)
             deltat = 1000  # in ms
             t = np.linspace(100, -deltat, len(kernel))
-            if np.sign(np.mean(kernel)) == -1:
+            if abs(kernel.min()) > abs(kernel.max()) == -1:
                 plt.plot(t, kernel, color=cur_pal[0],linewidth=4)
             else:
                 plt.plot(t, kernel, color=cur_pal[2],linewidth=4)
@@ -1372,10 +1372,10 @@ class STA(dj.Computed):
 
             fig.add_subplot(2, 2, 4)
 
-            if np.sign(np.mean(u)) == -1:
-                plt.plot(t, u, color='b',linewidth=4)
+            if abs(u.min()) > abs(u.max()):
+                plt.plot(t, u, color=cur_pal[0],linewidth=4)
             else:
-                plt.plot(t, u, color='r',linewidth=4)
+                plt.plot(t, u, color=cur_pal[2],linewidth=4)
 
             plt.locator_params(axis='y', nbins=4)
             ax = fig.gca()
