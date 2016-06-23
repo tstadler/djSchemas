@@ -293,7 +293,7 @@ class Cut(dj.Computed):
              }
         )
 
-        cur_pal = sns.current_palette()
+        cur_pal = sns.color_palette()
 
         cols1 = [cur_pal[0]] * len(dens1)
         for i in idx_thr1:
@@ -386,7 +386,7 @@ class Cut(dj.Computed):
             eye = (Experiment() & key).fetch1['eye']
             cell_id = (Cell() & key).fetch1['cell_id']
 
-            cur_pal = sns.current_palette()
+            cur_pal = sns.color_palette()
 
             cols1 = [cur_pal[0]] * len(dens1)
             for i in idx_thr1:
