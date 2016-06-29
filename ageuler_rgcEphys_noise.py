@@ -762,7 +762,7 @@ class Stim(dj.Computed):
         Q = np.diag(1 / np.sqrt(el))
         S = np.dot(Q, np.dot(ev.T, Fc))  # whitening transform
 
-        self.insert1(dict(key, sc = Fc, t = stim_dim[1], ns_x = int(stim_dim[0]), ns_y = int(stim_dim[1])))
+        self.insert1(dict(key, sc = Fc, t = stim_dim[2], ns_x = int(stim_dim[0]), ns_y = int(stim_dim[1])))
 
 @schema
 class Sta(dj.Computed):
