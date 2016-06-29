@@ -1067,8 +1067,8 @@ class Sta(dj.Computed):
             cbi.update_ticks()
 
             fig.add_subplot(2, 2, 2)
-            deltat = 1000  # in ms
-            t = np.linspace(100, -deltat, len(kernel))
+
+            t = np.linspace(future, -deltat, len(kernel))
             if abs(kernel.min()) > abs(kernel.max()):
                 plt.plot(t, scimage.gaussian_filter(kernel, .7), color=curpal[0], linewidth=4)
             else:
@@ -1107,6 +1107,49 @@ class Sta(dj.Computed):
             plt.subplots_adjust(top=.8)
 
             return fig
+
+    def plt_spacetime(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            #(ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
+            sta = (self & key).fetch1['sta']
+            deltat = (self & key).fetch1['tpast']
+            future = (self & key).fetch1['tfuture']
+            ns, nt = sta.shape
+
+            sta = (self & key).fetch1['sta']
+
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+
+            ax.imshow(np.repeat(sta, 10, axis=1).T[::-1], cmap=plt.cm.coolwarm)
+            ax.set_xlabel('space')
+            ax.set_ylabel('time [ms]', labelpad=20)
+            ax.set_yticks(np.linspace(0, (nt ) * 10, nt ))
+            ax.set_yticklabels(np.arange(-deltat + future, future, (deltat + future) / (nt+1)).astype(int))
+
+            fig.subplots_adjust(top=.88)
+            plt.suptitle('Spacetime STA\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
+
+            return fig
+
+
+
 
 
 
