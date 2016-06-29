@@ -715,9 +715,7 @@ class Stim(dj.Computed):
     ->Trigger
     ->StimMeta
     ---
-    s   	: longblob		# stimulus as a (ns x t) array, where ns = ns_x x ns_y
     sc   	: longblob		# centered stimulus as a (ns x t) array, where ns = ns_x x ns_y
-    swhite 	: longblob		# whitened stimulus as a (ns x t) array, where ns = ns_x x ns_y
     t	    : int			# number of frames
     ns_x	: int			# number of pixel rows
     ns_y	: int			# number of pixel columns
@@ -764,7 +762,7 @@ class Stim(dj.Computed):
         Q = np.diag(1 / np.sqrt(el))
         S = np.dot(Q, np.dot(ev.T, Fc))  # whitening transform
 
-        self.insert1(dict(key, s = Frames,sc = Fc, swhite=S, t = stim_dim[1], ns_x = int(stim_dim[0]), ns_y = int(stim_dim[1])))
+        self.insert1(dict(key, sc = Fc, t = stim_dim[1], ns_x = int(stim_dim[0]), ns_y = int(stim_dim[1])))
 
 @schema
 class Sta(dj.Computed):
