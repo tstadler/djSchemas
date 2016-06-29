@@ -1206,7 +1206,7 @@ class Stc(dj.Computed):
             stc_pca[:, tau] = np.mean(evec[:, 0:2], 1)  # keep first pc
             stc_ev[:, tau] = ev
 
-        self.insert1(dict(key, stc = stc, stc_pca = stc_pca, stc_ev = stc_ev))
+        self.insert1(dict(key, stc = stc))#, stc_pca = stc_pca, stc_ev = stc_ev))
 
 
 
