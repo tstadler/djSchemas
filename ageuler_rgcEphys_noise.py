@@ -1208,6 +1208,57 @@ class Stc(dj.Computed):
 
         self.insert1(dict(key, stc_pca = stc_pca, stc_ev = stc_ev))
 
+    def plt_deltas(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            (ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
+            deltat = (Sta() & key).fetch1['tpast']
+            future = (Sta() & key).fetch1['tfuture']
+            ns = ns_x * ns_y
+            nt = 10
+
+            stc_pca = (self & key).fetch1['stc_pca']
+
+            fig, axarr = plt.subplots(2, int(nt / 2))
+            ax = axarr.flatten()
+            clim = (stc_pca.min(), stc_pca.max())
+
+            for tau in range(int(len(ax))):
+                im = ax[tau].imshow(stc_pca[:, tau].reshape(ns_x, ns_y),
+                                    interpolation='nearest',
+                                    cmap=plt.cm.coolwarm,
+                                    clim=clim)
+                ax[tau].set_xticks([])
+                ax[tau].set_yticks([])
+                ax[tau].set_title('$\\tau$ = %.0f ms' % (future - tau * int(deltat / (nt))))
+            fig.subplots_adjust(right=0.8)
+            cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
+            cbar = fig.colorbar(im, cax=cbar_ax)
+            cbar.set_label('intensity', labelpad=40, rotation=270)
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            plt.suptitle('First PC of STC for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
+
+            return fig
+
 
 
 
