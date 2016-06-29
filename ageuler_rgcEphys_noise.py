@@ -905,7 +905,7 @@ class Sta(dj.Computed):
                                     clim=clim)
                 ax[tau].set_xticks([])
                 ax[tau].set_yticks([])
-                ax[tau].set_title('$\\tau$ = %.0f ms' % (future - tau * int(deltat / (nt - 1))))
+                ax[tau].set_title('$\\tau$ = %.0f ms' % (future - tau * int(deltat / (nt))))
             fig.subplots_adjust(right=0.8)
             cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
             cbar = fig.colorbar(im, cax=cbar_ax)
@@ -914,6 +914,109 @@ class Sta(dj.Computed):
             plt.suptitle('STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
+
+    def plt_deltas_norm(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            (ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
+            sta = (self & key).fetch1['sta']
+            deltat = (self & key).fetch1['tpast']
+            future = (self & key).fetch1['tfuture']
+            ns, nt = sta.shape
+
+            sta = (self & key).fetch1['sta']
+
+            sta_z = (sta - np.mean(sta[0:ns_x, :])) / abs(sta).max()
+
+            fig, axarr = plt.subplots(2, int(nt / 2))
+            ax = axarr.flatten()
+            clim = (sta_z.min(), sta_z.max())
+
+            for tau in range(int(len(ax))):
+                im = ax[tau].imshow(sta_z[:, tau].reshape(ns_x, ns_y),
+                                    interpolation='nearest',
+                                    cmap=plt.cm.coolwarm,
+                                    clim=clim)
+                ax[tau].set_xticks([])
+                ax[tau].set_yticks([])
+                ax[tau].set_title('$\\tau$ = %.0f ms' % (future - tau * int(deltat / (nt))))
+            fig.subplots_adjust(right=0.8)
+            cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
+            cbar = fig.colorbar(im, cax=cbar_ax)
+            cbar.set_label('normalized intensity', labelpad=40, rotation=270)
+
+            plt.suptitle('Normalized STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
+
+            return fig
+
+    def plt_deltas_sd(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            (ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
+            sta = (self & key).fetch1['sta']
+            deltat = (self & key).fetch1['tpast']
+            future = (self & key).fetch1['tfuture']
+            ns, nt = sta.shape
+
+            sta = (self & key).fetch1['sta']
+            sd_map = np.std(sta, 1)
+            sta_sd = sta / sd_map[:, None]
+
+            fig, axarr = plt.subplots(2, int(nt / 2))
+            ax = axarr.flatten()
+            clim = (-np.percentile(sta_sd,90), np.percentile(sta_sd,90))
+
+            for tau in range(int(len(ax))):
+                im = ax[tau].imshow(sta_sd[:, tau].reshape(ns_x, ns_y),
+                                    interpolation='nearest',
+                                    cmap=plt.cm.coolwarm,
+                                    clim=clim)
+                ax[tau].set_xticks([])
+                ax[tau].set_yticks([])
+                ax[tau].set_title('$\\tau$ = %.0f ms' % (future - tau * int(deltat / (nt))))
+            fig.subplots_adjust(right=0.8)
+            cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
+            cbar = fig.colorbar(im, cax=cbar_ax)
+            cbar.set_label('s.d. units', labelpad=40, rotation=270)
+
+            plt.suptitle('Standard deviation of STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+
 
 
 def addEntry(animal_id,sex,date_of_birth,exp_date,experimenter,eye,cell_id,data_folder,rec_type, ch_voltage, ch_trigger,filename):
