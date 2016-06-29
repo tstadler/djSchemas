@@ -910,6 +910,9 @@ class Sta(dj.Computed):
             cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
             cbar = fig.colorbar(im, cax=cbar_ax)
             cbar.set_label('intensity', labelpad=40, rotation=270)
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
 
             plt.suptitle('STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
@@ -960,6 +963,9 @@ class Sta(dj.Computed):
             cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
             cbar = fig.colorbar(im, cax=cbar_ax)
             cbar.set_label('normalized intensity', labelpad=40, rotation=270)
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
 
             plt.suptitle('Normalized STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
@@ -1010,12 +1016,97 @@ class Sta(dj.Computed):
             cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
             cbar = fig.colorbar(im, cax=cbar_ax)
             cbar.set_label('s.d. units', labelpad=40, rotation=270)
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
 
             plt.suptitle('Standard deviation of STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
             return fig
 
+    def plt_svd(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            (ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
+            rf,kernel = (self & key).fetch1['rf','kernel']
+            ws, wt = (self & key).fetch1['ws', 'wt']
+            idt,future,deltat = (self & key).fetch1['idt','tfuture','tpast']
+            nt = len(kernel)
+
+            tau = future - idt * int(deltat / (nt))
+            fig = plt.figure()
+            fig.suptitle(' STA at $\Delta$ t: ' + str(tau) + ' ms (upper panel) and SVD (lower panel) \n' + str(
+                exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
+
+            fig.add_subplot(2, 3, 1)
+
+            im = plt.imshow(rf.reshape(ns_x, ns_y), interpolation='none', cmap=plt.cm.coolwarm, origin='upper')
+            cbi = plt.colorbar(im)
+            plt.xticks([])
+            plt.yticks([])
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbi.locator = tick_locator
+            cbi.update_ticks()
+
+            fig.add_subplot(2, 2, 2)
+            deltat = 1000  # in ms
+            t = np.linspace(100, -deltat, len(kernel))
+            if abs(kernel.min()) > abs(kernel.max()):
+                plt.plot(t, scimage.gaussian_filter(kernel, .7), color=curpal[0], linewidth=4)
+            else:
+                plt.plot(t, scimage.gaussian_filter(kernel, .7), color=curpal[2], linewidth=4)
+
+            plt.locator_params(axis='y', nbins=4)
+            ax = fig.gca()
+            ax.set_xticklabels([])
+            ax.set_xlim([100, -deltat])
+            plt.ylabel('stimulus intensity', labelpad=20)
+
+            fig.add_subplot(2, 3, 4)
+            im = plt.imshow(ws.reshape(ns_x, ns_y), interpolation='none', cmap=plt.cm.coolwarm, origin='upper')
+            cbi = plt.colorbar(im)
+            plt.xticks([])
+            plt.yticks([])
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbi.locator = tick_locator
+            cbi.update_ticks()
+            plt.xticks([])
+            plt.yticks([])
+
+            fig.add_subplot(2, 2, 4)
+
+            if abs(wt.min()) > abs(wt.max()):
+                plt.plot(t, scimage.gaussian_filter(wt, .7), color=curpal[0], linewidth=4)
+            else:
+                plt.plot(t, scimage.gaussian_filter(wt, .7), color=curpal[2], linewidth=4)
+
+            plt.locator_params(axis='y', nbins=4)
+            ax = fig.gca()
+            ax.set_xlim([100, -deltat])
+            plt.xlabel('time [ms]', labelpad=10)
+            plt.ylabel('stimulus intensity', labelpad=20)
+
+            plt.subplots_adjust(top=.8)
+
+            return fig
 
 
 
