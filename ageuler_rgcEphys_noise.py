@@ -912,6 +912,94 @@ class Sta(dj.Computed):
             return fig
 
 
+def addEntry(animal_id,sex,date_of_birth,exp_date,experimenter,eye,cell_id,data_folder,rec_type, ch_voltage, ch_trigger,filename):
+    """
+
+    :param animal_id: str 'ZK0-yyyy-mm-dd'
+    :param sex: str 'F' or 'M'
+    :param date_of_birth: str 'yyyy-mm-dd'
+    :param exp_date: str 'yyyy-mm-dd'
+    :param experimenter str 'tstadler' who did the experiment?
+    :param eye: str 'R' or 'L'
+    :param cell_id: int 1-16
+    :param morph: boolean
+    :param type: str 'putative cell type'
+    :param data_folder: str '/notebooks/Data_write/Data/Stadler/'
+    :param filename: str 'BWNoise'
+    :return: adds the given recording to the mysql schema 'ageuler_rgcEphys'
+    """
+
+    A = Animal()
+    E = Experiment()
+    C = Cell()
+    R = Recording()
+
+    if (len(A & dict(animal_id=animal_id)) == 0):
+        print('Animal new')
+        try:
+            A.insert1({'animal_id': animal_id, 'sex': sex, 'date_of_birth': date_of_birth})
+        except Exception as e1:
+            print(e1)
+    else:
+        print('Animal id already in db.')
+
+    if len(E & dict(animal_id=animal_id, exp_date=exp_date, eye=eye)) == 0:
+        print('Experiment new')
+        try:
+            exp_path = data_folder + exp_date + '/' + eye + '/'
+            E.insert1({'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'path': exp_path,'experimenter':experimenter})
+
+        except Exception as e2:
+            print(e2)
+    else:
+        print('Experimental day already in db')
+
+    if len(C & dict(animal_id=animal_id, exp_date=exp_date, cell_id=cell_id)) == 0:
+        print('Cell id new')
+        try:
+            subexp_path = str(cell_id) + '/'
+            print('Cell id: ', cell_id)
+            morph = bool(int(input('Morphology of this cell was recorded? ')))
+            cell_type = str(input('Any guess for the cell type? '))
+            C.insert1(
+                {'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'cell_id': cell_id, 'folder': subexp_path,
+                 'morphology': morph, 'type': cell_type})
+        except Exception as e3:
+            print(e3)
+    else:
+        print(('Cell already in db'))
+
+    if len(R & dict(animal_id=animal_id, exp_date=exp_date, eye=eye, cell_id=cell_id, filename=filename)) == 0:
+        print('Recording new')
+
+        try:
+            if 'Noise' in filename:
+                R.insert1(
+                    {'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'cell_id': cell_id, 'filename': filename,
+                     'stim_type': 'bw_noise', 'rec_type': rec_type, 'ch_voltage': ch_voltage, 'ch_trigger': ch_trigger})
+            if 'Chirp' in filename:
+                R.insert1(
+                    {'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'cell_id': cell_id, 'filename': filename,
+                     'stim_type': 'chirp', 'rec_type': rec_type, 'ch_voltage': ch_voltage, 'ch_trigger': ch_trigger})
+            if 'DS' in filename:
+                R.insert1(
+                    {'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'cell_id': cell_id, 'filename': filename,
+                     'stim_type': 'ds', 'rec_type': rec_type, 'ch_voltage': ch_voltage, 'ch_trigger': ch_trigger})
+            if 'ON' in filename:
+                R.insert1(
+                    {'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'cell_id': cell_id, 'filename': filename,
+                     'stim_type': 'on_off', 'rec_type': rec_type, 'ch_voltage': ch_voltage, 'ch_trigger': ch_trigger})
+            else:
+                R.insert1(
+                    {'animal_id': animal_id, 'exp_date': exp_date, 'eye': eye, 'cell_id': cell_id, 'filename': filename,
+                     'stim_type': 'unknown', 'rec_type': rec_type, 'ch_voltage': ch_voltage, 'ch_trigger': ch_trigger})
+        except Exception as e4:
+            print(e4)
+    else:
+        print('Recording already in db')
+
+
+
 
 
 
