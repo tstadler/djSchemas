@@ -1143,7 +1143,7 @@ class Sta(dj.Computed):
             ax.set_yticks(np.linspace(0, (nt ) * 10, nt ))
             ax.set_yticklabels(np.arange(-deltat + future, future, (deltat + future) / (nt+1)).astype(int))
 
-            fig.subplots_adjust(top=.88)
+            #fig.subplots_adjust(top=.9)
             plt.suptitle('Spacetime STA\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
