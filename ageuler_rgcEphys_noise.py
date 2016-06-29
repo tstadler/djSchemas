@@ -711,6 +711,8 @@ class Stim(dj.Computed):
     definition="""
     # Stimulus frames for a given mseq
 
+    ->Spikes
+    ->Trigger
     ->StimMeta
     ---
     s   	: longblob		# stimulus as a (ns x t) array, where ns = ns_x x ns_y
@@ -720,6 +722,10 @@ class Stim(dj.Computed):
     ns_x	: int			# number of pixel rows
     ns_y	: int			# number of pixel columns
     """
+
+    @property
+    def populated_from(self):
+        return Recording() & dict(stim_type='bw_noise')
 
     def _make_tuples(self, key):
 
