@@ -1148,6 +1148,69 @@ class Sta(dj.Computed):
 
             return fig
 
+@schema
+class Stc(dj.Computed):
+    definition="""
+    -> Sta
+    ---
+    stc         :longblob       # array (ns x ns x nt) with stc at each time lag
+    stc_pca     :longblob       # array (ns x nt) with first eigenvector of stc as column at each time lag
+    stc_ev      :longblob       # array (ns x nt) with eigenvalues of stc as column at each time lag
+    """
+
+    def _make_tuples(self, key):
+
+        fs = (Recording() & key).fetch1['fs']
+
+        rec_len = (Spikes() & key).fetch1['rec_len']
+        spiketimes = (Spikes() & key).fetch1['spiketimes']
+        triggertimes = (Trigger() & key).fetch1['triggertimes']
+
+        freq = (StimMeta() & key).fetch1['freq']
+
+        ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
+
+        sc = (Stim() & key).fetch1['sc']
+
+        sta = (Sta() & key).fetch1['sta']
+
+        ns = int(ns_x * ns_y)
+        ntrigger = int(len(triggertimes))
+
+        deltat = 1000  # time lag before spike in [ms]
+        delta = int(deltat * fs * 1e-3)
+        spiketimes = spiketimes[spiketimes > triggertimes[0] + delta]
+        spiketimes = spiketimes[spiketimes < triggertimes[ntrigger - 1] + int(fs / freq) - 1]
+        nspikes = int(len(spiketimes))
+
+        Scut = sc[:, 0:ntrigger]
+
+        nt = 11  # number of time steps into the past, delta is deltat/nt
+
+        stimInd = np.zeros(rec_len).astype(int) - 1
+        for n in range(ntrigger - 1):
+            stimInd[triggertimes[n]:triggertimes[n + 1] - 1] += int(n + 1)
+
+        stimInd[triggertimes[ntrigger - 1]:triggertimes[ntrigger - 1] + (fs / freq) - 1] += int(ntrigger)
+
+        ste = np.zeros([ns, nt - 1, nspikes])
+
+        stc = np.zeros((ns, ns, nt - 1))
+        stc_pca = np.zeros(sta.shape)
+        stc_ev = np.zeros(sta.shape)
+        for tau in range(nt - 1):
+            stc[:, :, tau] = np.dot((ste[:, tau, :] - sta[:, tau, None]),
+                                    (ste[:, tau, :] - sta[:, tau, None]).T) / nspikes
+            ev, evec = np.linalg.eig(stc[:, :, tau])
+
+            stc_pca[:, tau] = np.mean(evec[:, 0:2], 1)  # keep first pc
+            stc_ev[:, tau] = ev
+
+        self.insert1(dict(key, stc = stc, stc_pca = stc_pca, stc_ev = stc_ev))
+
+
+
+
 
 
 
