@@ -445,6 +445,7 @@ class Trigger(dj.Computed):
     ->Recording
     ---
     triggertimes	:longblob	# trigger times in sample points
+    ntrigger        :int        # n of triggers = n of stimulus frames displayed
     """
 
     def _make_tuples(self, key):
@@ -480,7 +481,7 @@ class Trigger(dj.Computed):
         triggertimes = np.where(dif == -1)[0]
 
         # insert
-        self.insert1(dict(key, triggertimes=triggertimes))
+        self.insert1(dict(key, triggertimes=triggertimes,ntrigger = int(len(triggertimes))))
 
     def plt_rawtrace(self):
 
@@ -710,9 +711,7 @@ class StimMeta(dj.Computed):
 class Stim(dj.Computed):
     definition="""
     # Stimulus frames for a given mseq
-
-    ->Spikes
-    ->Trigger
+    ->Recording
     ->StimMeta
     ---
     sc   	: longblob		# centered stimulus as a (ns x t) array, where ns = ns_x x ns_y
@@ -768,7 +767,9 @@ class Stim(dj.Computed):
 class Sta(dj.Computed):
     definition = """
         # Calculate the spike-triggered ensemble from noise recording
-        -> Recording
+        -> Stim
+        -> Spikes
+        -> Trigger
         ---
         sta         : longblob	# spike-triggered average
         kernel      : longblob  # temporal kernel from center pixel with highest s.d.
@@ -1152,6 +1153,7 @@ class Sta(dj.Computed):
 @schema
 class Stc(dj.Computed):
     definition="""
+    -> Stim
     -> Sta
     ---
     stc         :longblob       # array (ns x ns x nt) with stc at each time lag
@@ -1303,7 +1305,74 @@ class Stc(dj.Computed):
 
 
 
+@schema
+class StimInst(dj.Computed):
+    definition="""
+    -> Stim
+    -> Sta
+    ---
+    s_inst      :longblob       # array (ns x T)
+    """
 
+    def _make_tuples(self, key):
+
+        freq = (StimMeta() & key).fetch1['freq']
+        Sc = (Stim() & key).fetch1['sc']
+        delta_past, delta_future = (Sta() & key).fetch1['tpast','tfuture']
+        wt =(Sta() & key).fetch1['wt']
+
+        nt = len(wt)
+        kt = (delta_past + delta_future) /nt
+
+        step = int((1 / freq * 1e3) / kt)
+        weights = wt[::step]  # need to get in same resolution as stim freq
+        weights_pad = np.vstack((np.zeros(weights[:, None].shape),
+                                 weights[:, None]))  # zero-padding to shift origin of weights vector accordingly
+
+        s_inst = scimage.filters.convolve(Sc.T, weights_pad).T
+
+        self.insert1(dict(key,s_inst = s_inst))
+@schema
+class StaInst(dj.Computed):
+    definition="""
+    -> StimInst
+    -> Spikes
+    -> Trigger
+    ---
+    sta_inst    :longblob   # array (ns x 1) instantaneous linear spatial filter
+    """
+
+    @property
+    def populated_from(self):
+        return Recording() & dict(stim_type='bw_noise')
+
+    def _make_tuples(self,key):
+
+        rec_len = (Spikes() & key).fetch1['rec_len']
+        spiketimes = (Spikes() & key).fetch1['spiketimes']
+        triggertimes = (Trigger() & key).fetch1['triggertimes']
+        ntrigger = int(len(triggertimes))
+
+        s_inst = (StimInst() & key).fetch1['s_inst']
+        s_inst = s_inst[:,0:ntrigger]
+
+        y = []
+
+        for n in range(ntrigger - 1):
+
+            y.append(int(len(spiketimes[(spiketimes > triggertimes[n]) & (spiketimes < triggertimes[n + 1])])))
+
+        y.append(int(len(spiketimes[(spiketimes > triggertimes[ntrigger - 1]) & (spiketimes < triggertimes[ntrigger - 1] + (fs / freq))])))
+        y = np.array(y)
+
+
+
+        I = np.dot(s_inst, s_inst.T)
+        a = np.dot(s_inst, y)
+
+        w_sta = np.linalg.solve(I, a)
+
+        self.insert1(dict(key,sta_inst = w_sta))
 
 
 
