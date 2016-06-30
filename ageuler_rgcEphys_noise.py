@@ -1522,7 +1522,7 @@ class NonlinInst(dj.Computed):
             aopt,bopt,copt = (self & key).fetch1['aopt','bopt','copt']
 
             p_ys = np.nan_to_num(rate)
-            f = self.non_lin_exp(s1d[p_ys!=0],aopt,bopt,copt)
+            f = self.non_lin_exp(s1d,aopt,bopt,copt)
 
             fig, ax = plt.subplots()
             fig.tight_layout()
