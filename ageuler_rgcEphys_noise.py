@@ -1143,7 +1143,7 @@ class Sta(dj.Computed):
             ax.set_xlabel('space')
             ax.set_ylabel('time [ms]', labelpad=20)
             ax.set_yticks(np.linspace(4, nt * 10 - 4, nt))
-            ax.set_yticklabels(np.linspace(delta_future, -delta_past + delta_future, nt).astype(int))
+            ax.set_yticklabels(np.linspace(-delta_past + delta_future, delta_future, nt).astype(int))
             #fig.subplots_adjust(top=.9)
             plt.suptitle('Spacetime STA\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
@@ -1262,6 +1262,42 @@ class Stc(dj.Computed):
             cbar.update_ticks()
 
             plt.suptitle('First PC of STC for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
+
+            return fig
+
+    def plt_spacetime(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            # (ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
+            stc_pca = (self & key).fetch1['stc_pca']
+            delta_future, delta_past = (Sta() & key).fetch1['tfuture', 'tpast']
+            ns, nt = stc_pca.shape
+
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+
+            ax.imshow(np.repeat(stc_pca, 10, axis=1).T[::-1], cmap=plt.cm.coolwarm)
+            ax.set_xlabel('space')
+            ax.set_ylabel('time [ms]', labelpad=20)
+            ax.set_yticks(np.linspace(4, nt * 10 - 4, nt))
+            ax.set_yticklabels(np.linspace(-delta_past + delta_future, delta_future, nt).astype(int))
+            # fig.subplots_adjust(top=.9)
+            plt.suptitle('First PC of spacetime STC\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
 
