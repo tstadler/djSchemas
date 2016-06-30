@@ -1498,6 +1498,47 @@ class NonlinInst(dj.Computed):
 
             return fig
 
+    def plt_rate(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            s1d,rate = (self & key).fetch1['s1d_sta','rate']
+            aopt,bopt,copt = (self & key).fetch1['aopt','bopt','copt']
+
+            p_ys = np.nan_to_num(rate)
+            f = self.non_lin_exp(s1d[p_ys!=0],aopt,bopt,copt)
+
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12)
+            ax.plot(s1d, f)
+            ax.set_xlabel('projection onto STA axis')
+            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
+            plt.locator_params(nbins=4)
+
+            plt.suptitle('Instantaneous Non-Linearity Estimate\n' + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
 
 
 
