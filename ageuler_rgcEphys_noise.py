@@ -1156,7 +1156,6 @@ class Stc(dj.Computed):
     -> Stim
     -> Sta
     ---
-    stc         :longblob       # array (ns x ns x nt) with stc at each time lag
     stc_pca     :longblob       # array (ns x nt) with first eigenvector of stc as column at each time lag
     stc_ev      :longblob       # array (ns x nt) with eigenvalues of stc as column at each time lag
     """
@@ -1348,10 +1347,13 @@ class StaInst(dj.Computed):
 
     def _make_tuples(self,key):
 
+        fs = (Recording() & key).fetch1['fs']
+        freq = (StimMeta() & key).fetch1['freq']
+
         rec_len = (Spikes() & key).fetch1['rec_len']
         spiketimes = (Spikes() & key).fetch1['spiketimes']
-        triggertimes = (Trigger() & key).fetch1['triggertimes']
-        ntrigger = int(len(triggertimes))
+        triggertimes,ntrigger = (Trigger() & key).fetch1['triggertimes','ntrigger']
+
 
         s_inst = (StimInst() & key).fetch1['s_inst']
         s_inst = s_inst[:,0:ntrigger]
