@@ -1423,8 +1423,14 @@ class NonlinInst(dj.Computed):
 
         rate = p_ste / p_rse/ nb
         p_ys = np.nan_to_num(rate)
-        popt=(0,0,0)
-        #popt, pcov = scoptimize.curve_fit(self.non_lin_exp, s1d[p_ys != 0], p_ys[p_ys != 0])
+
+        try:
+            popt, pcov = scoptimize.curve_fit(self.non_lin_exp, s1d[p_ys != 0], p_ys[p_ys != 0])
+
+        except Exception as e1:
+            print('Exponential fit failed due to:\n', e1)
+            popt=(0,0,0)
+
         aopt, bopt, copt = popt
 
         self.insert1(dict(key,
