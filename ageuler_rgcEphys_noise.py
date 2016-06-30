@@ -798,35 +798,39 @@ class Sta(dj.Computed):
         freq = (StimMeta() & key).fetch1['freq']
 
         ns_x, ns_y = (Stim() & key).fetch1['ns_x','ns_y']
+        ns = ns_x * ns_y
 
-        sc = (Stim() & key).fetch1['sc']
+        Sc = (Stim() & key).fetch1['sc']
 
-        ns = int(ns_x*ns_y)
         ntrigger = int(len(triggertimes))
 
-        deltat = 1000  # time lag before spike in [ms]
-        delta = int(deltat * fs * 1e-3)
-        spiketimes = spiketimes[spiketimes > triggertimes[0] + delta]
+        delta_future = 100  # time lag after spike in [ms]
+        delta_past = 900  # time lag before spike in [ms] is delta_past - delta_future
+
+        npast = int(delta_past * fs * 1e-3)
+        nfuture = int(delta_future * fs * 1e-3)
+
+        nt = 10  # determines how fine the time lag is sampled
+
+        kn = int((npast + nfuture) / (nt))  # sampling of stimulus in 100 ms steps
+
+
+        spiketimes = spiketimes[spiketimes > triggertimes[0] + npast]
         spiketimes = spiketimes[spiketimes < triggertimes[ntrigger - 1] + int(fs / freq) - 1]
         nspikes = int(len(spiketimes))
+        Scut = Sc[:, 0:ntrigger]
 
-        Scut = sc[:, 0:ntrigger]
-
-        nt = 11 # number of time steps into the past, delta is deltat/nt
 
         stimInd = np.zeros(rec_len).astype(int) - 1
         for n in range(ntrigger - 1):
             stimInd[triggertimes[n]:triggertimes[n + 1] - 1] += int(n + 1)
-
         stimInd[triggertimes[ntrigger - 1]:triggertimes[ntrigger - 1] + (fs / freq) - 1] += int(ntrigger)
 
-        ste = np.zeros([ns, nt - 1, nspikes])
-        k = int(delta / (nt - 1))  # sampling of stimulus in 100 ms steps
-        future = int(100 * fs * 1e-3)  # check also 100 ms before stimulus
+        ste = np.zeros([ns, nt, nspikes])
+
         for sp in range(nspikes):
-            for t in range(-future, delta - future, k):
-                # print(int(t/k))
-                ste[:, int((t + future) / k), sp] = np.array(Scut[:, stimInd[spiketimes[sp] - t]])
+            for t in range(-nfuture, npast, kn):
+                ste[:, int((t + nfuture) / kn), sp] = np.array(Scut[:, stimInd[spiketimes[sp] - t]])
         sta = ste.sum(axis=2) / nspikes
         sd_map = np.std(sta, 1)
 
@@ -859,8 +863,8 @@ class Sta(dj.Computed):
                             ws =  ws,
                             ev = ev,
                             wt = wt,
-                            tfuture = 100,
-                            tpast = deltat,
+                            tfuture = delta_future,
+                            tpast = delta_past,
                             ids = idc,
                             idt = idt,
         ))
@@ -887,12 +891,10 @@ class Sta(dj.Computed):
 
             (ns_x,ns_y) = (Stim() & key).fetch1['ns_x','ns_y']
             sta = (self & key).fetch1['sta']
-            deltat = (self & key).fetch1['tpast']
-            future = (self & key).fetch1['tfuture']
             ns,nt = sta.shape
+            delta_future,delta_past = (self & key).fetch1['tfuture','tpast']
+            kt = (delta_past + delta_future) / nt
 
-
-            sta = (self & key).fetch1['sta']
 
             fig, axarr = plt.subplots(2, int(nt / 2))
             ax = axarr.flatten()
@@ -905,7 +907,7 @@ class Sta(dj.Computed):
                                     clim=clim)
                 ax[tau].set_xticks([])
                 ax[tau].set_yticks([])
-                ax[tau].set_title('$\\tau$ = %.0f ms' % (future - tau * int(deltat / (nt))))
+                ax[tau].set_title('$\\tau$ = %.0f ms' % (-delta_future + tau * kt))
             fig.subplots_adjust(right=0.8)
             cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
             cbar = fig.colorbar(im, cax=cbar_ax)
@@ -939,11 +941,9 @@ class Sta(dj.Computed):
 
             (ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
             sta = (self & key).fetch1['sta']
-            deltat = (self & key).fetch1['tpast']
-            future = (self & key).fetch1['tfuture']
             ns, nt = sta.shape
-
-            sta = (self & key).fetch1['sta']
+            delta_future, delta_past = (self & key).fetch1['tfuture', 'tpast']
+            kt = (delta_past + delta_future) / nt
 
             sta_z = (sta - np.mean(sta[0:ns_x, :])) / abs(sta).max()
 
@@ -958,7 +958,7 @@ class Sta(dj.Computed):
                                     clim=clim)
                 ax[tau].set_xticks([])
                 ax[tau].set_yticks([])
-                ax[tau].set_title('$\\tau$ = %.0f ms' % (future - tau * int(deltat / (nt))))
+                ax[tau].set_title('$\\tau$ = %.0f ms' % (-delta_future + tau * kt))
             fig.subplots_adjust(right=0.8)
             cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
             cbar = fig.colorbar(im, cax=cbar_ax)
@@ -992,11 +992,10 @@ class Sta(dj.Computed):
 
             (ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
             sta = (self & key).fetch1['sta']
-            deltat = (self & key).fetch1['tpast']
-            future = (self & key).fetch1['tfuture']
             ns, nt = sta.shape
+            delta_future, delta_past = (self & key).fetch1['tfuture', 'tpast']
+            kt = (delta_past + delta_future) / nt
 
-            sta = (self & key).fetch1['sta']
             sd_map = np.std(sta, 1)
             sta_sd = sta / sd_map[:, None]
 
@@ -1011,7 +1010,7 @@ class Sta(dj.Computed):
                                     clim=clim)
                 ax[tau].set_xticks([])
                 ax[tau].set_yticks([])
-                ax[tau].set_title('$\\tau$ = %.0f ms' % (future - tau * int(deltat / (nt))))
+                ax[tau].set_title('$\\tau$ = %.0f ms' % (-delta_future + tau * kt))
             fig.subplots_adjust(right=0.8)
             cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
             cbar = fig.colorbar(im, cax=cbar_ax)
@@ -1048,10 +1047,12 @@ class Sta(dj.Computed):
             (ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
             rf,kernel = (self & key).fetch1['rf','kernel']
             ws, wt = (self & key).fetch1['ws', 'wt']
-            idt,future,deltat = (self & key).fetch1['idt','tfuture','tpast']
+            idt,delta_future,delta_past = (self & key).fetch1['idt','tfuture','tpast']
             nt = len(kernel)
+            kt = (delta_past + delta_future) / nt
+            tau = delta_future - idt*kt
 
-            tau = future - idt * int(deltat / (nt))
+
             fig = plt.figure()
             fig.suptitle(' STA at $\Delta$ t: ' + str(tau) + ' ms (upper panel) and SVD (lower panel) \n' + str(
                 exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
@@ -1067,8 +1068,7 @@ class Sta(dj.Computed):
             cbi.update_ticks()
 
             fig.add_subplot(2, 2, 2)
-
-            t = np.linspace(future, -deltat, len(kernel))
+            t = np.linspace(delta_future, -delta_past + delta_future, nt)
             if abs(kernel.min()) > abs(kernel.max()):
                 plt.plot(t, scimage.gaussian_filter(kernel, .7), color=curpal[0], linewidth=4)
             else:
@@ -1077,8 +1077,10 @@ class Sta(dj.Computed):
             plt.locator_params(axis='y', nbins=4)
             ax = fig.gca()
             ax.set_xticklabels([])
-            ax.set_xlim([100, -deltat])
+            ax.set_xlim([delta_future, -delta_past + delta_future])
             plt.ylabel('stimulus intensity', labelpad=20)
+            plt.locator_params(axis='x', nbins=6)
+            plt.locator_params(axis='y', nbins=4)
 
             fig.add_subplot(2, 3, 4)
             im = plt.imshow(ws.reshape(ns_x, ns_y), interpolation='none', cmap=plt.cm.coolwarm, origin='upper')
@@ -1100,9 +1102,12 @@ class Sta(dj.Computed):
 
             plt.locator_params(axis='y', nbins=4)
             ax = fig.gca()
-            ax.set_xlim([100, -deltat])
+            ax.set_xlim([delta_future, -delta_past + delta_future])
             plt.xlabel('time [ms]', labelpad=10)
             plt.ylabel('stimulus intensity', labelpad=20)
+
+            plt.locator_params(axis='x', nbins=6)
+            plt.locator_params(axis='y', nbins=4)
 
             plt.subplots_adjust(top=.8)
 
@@ -1128,11 +1133,8 @@ class Sta(dj.Computed):
 
             #(ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
             sta = (self & key).fetch1['sta']
-            deltat = (self & key).fetch1['tpast']
-            future = (self & key).fetch1['tfuture']
+            delta_future,delta_past = (self & key).fetch1['tfuture','tpast']
             ns, nt = sta.shape
-
-            sta = (self & key).fetch1['sta']
 
             fig, ax = plt.subplots()
             fig.tight_layout()
@@ -1140,9 +1142,8 @@ class Sta(dj.Computed):
             ax.imshow(np.repeat(sta, 10, axis=1).T[::-1], cmap=plt.cm.coolwarm)
             ax.set_xlabel('space')
             ax.set_ylabel('time [ms]', labelpad=20)
-            ax.set_yticks(np.linspace(0, (nt ) * 10, nt ))
-            ax.set_yticklabels(np.arange(-deltat + future, future, (deltat + future) / (nt+1)).astype(int))
-
+            ax.set_yticks(np.linspace(4, nt * 10 - 4, nt))
+            ax.set_yticklabels(np.linspace(delta_future, -delta_past + delta_future, nt).astype(int))
             #fig.subplots_adjust(top=.9)
             plt.suptitle('Spacetime STA\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
@@ -1170,35 +1171,40 @@ class Stc(dj.Computed):
 
         ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
 
-        sc = (Stim() & key).fetch1['sc']
-
+        Sc = (Stim() & key).fetch1['sc']
         sta = (Sta() & key).fetch1['sta']
+        delta_future,delta_past = (Sta() & key).fetch1['tfuture','tpast']
+        ns,nt = sta.shape
+        npast = int(delta_past * fs * 1e-3)
+        nfuture = int(delta_future * fs * 1e-3)
 
-        ns = int(ns_x * ns_y)
+        kn = int((npast + nfuture) / (nt))  # sampling of stimulus in 100 ms steps
         ntrigger = int(len(triggertimes))
 
-        deltat = 1000  # time lag before spike in [ms]
-        delta = int(deltat * fs * 1e-3)
-        spiketimes = spiketimes[spiketimes > triggertimes[0] + delta]
+
+        npast = int(delta_past * fs * 1e-3)
+        nfuture = int(delta_future * fs * 1e-3)
+
+        spiketimes = spiketimes[spiketimes > triggertimes[0] + npast]
         spiketimes = spiketimes[spiketimes < triggertimes[ntrigger - 1] + int(fs / freq) - 1]
         nspikes = int(len(spiketimes))
-
-        Scut = sc[:, 0:ntrigger]
-
-        nt = 11  # number of time steps into the past, delta is deltat/nt
+        Scut = Sc[:, 0:ntrigger]
 
         stimInd = np.zeros(rec_len).astype(int) - 1
         for n in range(ntrigger - 1):
             stimInd[triggertimes[n]:triggertimes[n + 1] - 1] += int(n + 1)
-
         stimInd[triggertimes[ntrigger - 1]:triggertimes[ntrigger - 1] + (fs / freq) - 1] += int(ntrigger)
 
-        ste = np.zeros([ns, nt - 1, nspikes])
+        ste = np.zeros([ns, nt, nspikes])
 
-        stc = np.zeros((ns, ns, nt - 1))
+        for sp in range(nspikes):
+            for t in range(-nfuture, npast, kn):
+                ste[:, int((t + nfuture) / kn), sp] = np.array(Scut[:, stimInd[spiketimes[sp] - t]])
+
+        stc = np.zeros((ns, ns, nt))
         stc_pca = np.zeros(sta.shape)
         stc_ev = np.zeros(sta.shape)
-        for tau in range(nt - 1):
+        for tau in range(nt):
             stc[:, :, tau] = np.dot((ste[:, tau, :] - sta[:, tau, None]),
                                     (ste[:, tau, :] - sta[:, tau, None]).T) / nspikes
             ev, evec = np.linalg.eig(stc[:, :, tau])
@@ -1228,10 +1234,10 @@ class Stc(dj.Computed):
             eye = (Experiment() & key).fetch1['eye']
 
             (ns_x, ns_y) = (Stim() & key).fetch1['ns_x', 'ns_y']
-            deltat = (Sta() & key).fetch1['tpast']
-            future = (Sta() & key).fetch1['tfuture']
-            ns = ns_x * ns_y
-            nt = 10
+            sta = (Sta() & key).fetch1['sta']
+            ns, nt = sta.shape
+            delta_future, delta_past = (Sta() & key).fetch1['tfuture', 'tpast']
+            kt = (delta_past + delta_future) / nt
 
             stc_pca = (self & key).fetch1['stc_pca']
 
@@ -1246,7 +1252,7 @@ class Stc(dj.Computed):
                                     clim=clim)
                 ax[tau].set_xticks([])
                 ax[tau].set_yticks([])
-                ax[tau].set_title('$\\tau$ = %.0f ms' % (future - tau * int(deltat / (nt))))
+                ax[tau].set_title('$\\tau$ = %.0f ms' % (-delta_future + tau * kt))
             fig.subplots_adjust(right=0.8)
             cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
             cbar = fig.colorbar(im, cax=cbar_ax)
