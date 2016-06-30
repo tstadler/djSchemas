@@ -1339,6 +1339,8 @@ class StaInst(dj.Computed):
     -> Trigger
     ---
     sta_inst    :longblob   # array (ns x 1) instantaneous linear spatial filter
+    y           :longblob  # spike counts vector binned with 1/freq ms
+
     """
 
     @property
@@ -1374,7 +1376,75 @@ class StaInst(dj.Computed):
 
         w_sta = np.linalg.solve(I, a)
 
-        self.insert1(dict(key,sta_inst = w_sta))
+        self.insert1(dict(key,sta_inst = w_sta,y=y))
+
+
+@schema
+class NonlinInst(dj.Computed):
+    definition = """
+    -> StimInst
+    -> StaInst
+    ---
+    s1d_sta :longblob  # 1-dimensional stimulus projected onto sta axis
+    p_rse   :longblob   # density along 1d axis of raw stimulus ensemble
+    p_ste   :longblob   # density along 1d axis of spike-triggered stimulus ensemble
+    rate    :longblob   # ratio between histograms along 1d stimulus axis
+    aopt   :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    bopt   :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    copt   :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+
+    """
+
+    @property
+    def populated_from(self):
+        return Recording() & dict(stim_type='bw_noise')
+
+    def _make_tuples(self, key):
+
+        ntrigger =(Trigger() & key).fetch1['ntrigger']
+        s_inst =(StimInst() & key).fetch1['s_inst']
+        w_sta,y = (StaInst() & key).fetch1['sta_inst','y']
+
+
+        s1d_sta = np.dot(w_sta, s_inst)
+        nb = 100
+        lim = (s1d_sta.min() - 1, s1d_sta.max() + 1)
+        p_rse, vals = np.histogram(s1d_sta, bins=nb, range=(lim))
+        s1d = vals[0:nb]
+
+        ssp1d = []
+
+        for t in range(ntrigger):
+            if y[t] != 0:
+                for sp in range(y[t]):
+                    ssp1d.append(s1d_sta[t])
+        ssp1d = np.array(ssp1d)
+        p_ste, vals_ste = np.histogram(ssp1d, bins=nb, range=(lim))
+
+        rate = p_ste / p_rse/ nb
+        p_ys = np.nan_to_num(rate)
+
+        popt, pcov = scoptimize.curve_fit(self.non_lin_exp, s1d[p_ys != 0], p_ys[p_ys != 0])
+        aopt, bopt, copt = popt
+
+        self.insert1(dict(key,
+                          s1d_sta=s1d,
+                          p_rse=p_rse,
+                          p_ste=p_ste,
+                          rate=rate,
+                          aopt=aopt,
+                          bopt=bopt,
+                          copt=copt))
+
+
+
+
+
+
+
+    def non_lin_exp(self,x,a,b,c):
+        return a * np.exp(b * x) + c
+
 
 
 
