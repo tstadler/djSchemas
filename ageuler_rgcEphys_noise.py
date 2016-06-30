@@ -1252,7 +1252,7 @@ class Stc(dj.Computed):
                                     clim=clim)
                 ax[tau].set_xticks([])
                 ax[tau].set_yticks([])
-                ax[tau].set_title('$\\tau$ = %.0f ms' % (-delta_future + tau * kt))
+                ax[tau].set_title('$\\tau$ = %.0f ms' %-(-delta_future + tau * kt))
             fig.subplots_adjust(right=0.8)
             cbar_ax = fig.add_axes([0.85, 0.2, 0.02, 0.6])
             cbar = fig.colorbar(im, cax=cbar_ax)
