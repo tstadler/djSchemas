@@ -1385,13 +1385,17 @@ class NonlinInst(dj.Computed):
     -> StimInst
     -> StaInst
     ---
-    s1d_sta :longblob  # 1-dimensional stimulus projected onto sta axis
+    s1d_sta :longblob   # binned 1-dimensional stimulus projected onto sta axis
+    rse_mean    :double # mean of the projected raw stimulus ensemble
+    rse_var     :double # variance of the projected raw stimulus ensemble
     p_rse   :longblob   # density along 1d axis of raw stimulus ensemble
+    ste_mean    :double # mean of the projected spike-triggered stimulus ensemble
+    ste_var     :double # variance of the projected spike-trigger stimulus ensemble
     p_ste   :longblob   # density along 1d axis of spike-triggered stimulus ensemble
     rate    :longblob   # ratio between histograms along 1d stimulus axis
-    aopt   :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
-    bopt   :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
-    copt   :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    aopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    bopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    copt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
 
     """
 
@@ -1406,20 +1410,20 @@ class NonlinInst(dj.Computed):
         w_sta,y = (StaInst() & key).fetch1['sta_inst','y']
 
 
-        s1d_sta = np.dot(w_sta, s_inst)
+        rse1d = np.dot(w_sta, s_inst)
         nb = 100
-        lim = (s1d_sta.min() - 1, s1d_sta.max() + 1)
-        p_rse, vals = np.histogram(s1d_sta, bins=nb, range=(lim))
+        lim = (rse1d.min() - 1, rse1d.max() + 1)
+        p_rse, vals = np.histogram(rse1d, bins=nb, range=(lim))
         s1d = vals[0:nb]
 
-        ssp1d = []
+        ste1d = []
 
         for t in range(ntrigger):
             if y[t] != 0:
                 for sp in range(y[t]):
-                    ssp1d.append(s1d_sta[t])
-        ssp1d = np.array(ssp1d)
-        p_ste, vals_ste = np.histogram(ssp1d, bins=nb, range=(lim))
+                    ste1d.append(rse1d[t])
+        ste1d = np.array(ste1d)
+        p_ste, vals_ste = np.histogram(ste1d, bins=nb, range=(lim))
 
         rate = p_ste / p_rse/ nb
         p_ys = np.nan_to_num(rate)
@@ -1435,6 +1439,10 @@ class NonlinInst(dj.Computed):
 
         self.insert1(dict(key,
                           s1d_sta=s1d,
+                          rse_mean = np.mean(rse1d),
+                          rse_var=np.var(rse1d),
+                          ste_mean=np.mean(ste1d),
+                          ste_var=np.var(ste1d),
                           p_rse=p_rse,
                           p_ste=p_ste,
                           rate=rate,
@@ -1443,13 +1451,55 @@ class NonlinInst(dj.Computed):
                           copt=copt))
 
 
-
-
-
-
-
     def non_lin_exp(self,x,a,b,c):
         return a * np.exp(b * x) + c
+
+    def plt_1dhistograms(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            nspikes = (Spikes() & key).fetch1['nspikes']
+            ntrigger = (Trigger() & key).fetch1['ntrigger']
+            s1d =(self & key).fetch1['s1d_sta']
+            p_rse,rse_mean,rse_var = (self & key).fetch1['p_rse','rse_mean','rse_var']
+            p_ste, ste_mean, ste_var = (self & key).fetch1['p_ste', 'ste_mean', 'ste_var']
+
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            lim = (s1d.min(),s1d.max())
+            ax.bar(s1d, p_rse / ntrigger, width=.1, label='$p(s)$')
+            ax.bar(s1d, p_ste/ nspikes, width=.1, facecolor=curpal[2], label='$p(s|y)$')
+            ax.axvline(x=rse_mean, color=curpal[1])
+            ax.axvline(x=ste_mean, color=curpal[3])
+            ax.set_xlabel('Projection onto STA axis')
+            ax.set_ylabel('Probability', labelpad=20)
+            ax.legend(fontsize=20)
+            ax.set_xlim(lim)
+            plt.locator_params('y', nbins=4)
+
+            plt.suptitle('Histogram of the raw and spike-triggered stimulus ensemble\n' + str(exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+
+
 
 
 
