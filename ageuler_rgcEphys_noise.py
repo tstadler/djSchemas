@@ -1632,7 +1632,7 @@ class NonlinInstSoftmax(dj.Computed):
                           topt = topt,
                           res = res))
 
-    def softmax(x, a, t):
+    def softmax(self,x, a, t):
         ex = np.exp(x - a) / t
         sm = ex / ex.sum()
 
@@ -1714,7 +1714,7 @@ class NonlinInstThreshold(dj.Computed):
                           thropt = thropt,
                           res = res))
 
-    def threshold(x, a, thr):
+    def threshold(self,x, a, thr):
 
         return np.piecewise(x, [x < thr, x >= thr], [0, lambda x: a * x])
 
