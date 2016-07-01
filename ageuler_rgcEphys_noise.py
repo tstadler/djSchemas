@@ -1860,14 +1860,14 @@ class StcInstPca(dj.Computed):
         ns_x, ns_y = (Stim() & key).fetch1['ns_x','ns_y']
         stc_triu = (StcInst() & key).fetch1['stc_triu']
 
-        ns = ns_y*ns_y
+        ns = ns_x*ns_y
 
-        stc = np.zeros((ns, ns))
-        inds = np.triu_indices_from(stc)
-        stc[inds] = stc_triu
-        stc[inds[1], inds[0]] = stc_triu
+        stc_new = np.zeros((ns, ns))
+        inds = np.triu_indices_from(stc_new)
+        stc_new[inds] = stc_triu
+        stc_new[inds[1], inds[0]] = stc_triu
 
-        ev, evec = np.linalg.eig(stc)
+        ev, evec = np.linalg.eig(stc_new)
 
         fig = plt.figure()
 
