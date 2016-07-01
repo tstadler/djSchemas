@@ -1739,7 +1739,7 @@ class NonlinInstThreshold(dj.Computed):
             eye = (Experiment() & key).fetch1['eye']
 
             s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
-            aopt,thropt,res = (self & key).fetch1['aopt','topt','res']
+            aopt,thropt,res = (self & key).fetch1['aopt','thropt','res']
 
 
             p_ys = np.nan_to_num(rate)
