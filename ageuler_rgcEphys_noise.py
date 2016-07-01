@@ -1393,10 +1393,6 @@ class NonlinInst(dj.Computed):
     ste_var     :double # variance of the projected spike-trigger stimulus ensemble
     p_ste   :longblob   # density along 1d axis of spike-triggered stimulus ensemble
     rate    :longblob   # ratio between histograms along 1d stimulus axis
-    aopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
-    bopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
-    copt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
-
     """
 
     @property
@@ -1426,16 +1422,7 @@ class NonlinInst(dj.Computed):
         p_ste, vals_ste = np.histogram(ste1d, bins=nb, range=(lim))
 
         rate = p_ste / p_rse/ nb
-        p_ys = np.nan_to_num(rate)
 
-        try:
-            popt, pcov = scoptimize.curve_fit(self.non_lin_exp, s1d[p_ys != 0], p_ys[p_ys != 0])
-
-        except Exception as e1:
-            print('Exponential fit failed due to:\n', e1)
-            popt=(0,0,0)
-
-        aopt, bopt, copt = popt
 
         self.insert1(dict(key,
                           s1d_sta=s1d,
@@ -1445,14 +1432,8 @@ class NonlinInst(dj.Computed):
                           ste_var=np.var(ste1d),
                           p_rse=p_rse,
                           p_ste=p_ste,
-                          rate=rate,
-                          aopt=aopt,
-                          bopt=bopt,
-                          copt=copt))
-
-
-    def non_lin_exp(self,x,a,b,c):
-        return a * np.exp(b * x) + c
+                          rate=rate
+                          ))
 
     def plt_1dhistograms(self):
 
@@ -1519,6 +1500,80 @@ class NonlinInst(dj.Computed):
             eye = (Experiment() & key).fetch1['eye']
 
             s1d,rate = (self & key).fetch1['s1d_sta','rate']
+
+            p_ys = np.nan_to_num(rate)
+
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12)
+            ax.set_xlabel('projection onto STA axis')
+            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
+            plt.locator_params(nbins=4)
+
+            plt.suptitle('Ratio between STE and RSE densities\n' + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+@schema
+class NonlinInstExp(dj.Computed):
+    definition = """
+    -> NonlinInst
+    ->
+    ---
+    aopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    bopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    copt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+
+    """
+
+    def _make_tuples(self, key):
+
+
+        s1d,rate = (NonlinInst & key).fetch1['s1d_sta','rate']
+        p_ys = np.nan_to_num(rate)
+
+        try:
+            popt, pcov = scoptimize.curve_fit(self.non_lin_exp, s1d[p_ys != 0], p_ys[p_ys != 0])
+
+        except Exception as e1:
+            print('Exponential fit failed due to:\n', e1)
+            popt=(0,0,0)
+
+        aopt, bopt, copt = popt
+
+        self.insert1(dict(key,
+                          aopt=aopt,
+                          bopt=bopt,
+                          copt=copt))
+
+
+    def non_lin_exp(self,x,a,b,c):
+        return a * np.exp(b * x) + c
+
+    def plt_rate(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
             aopt,bopt,copt = (self & key).fetch1['aopt','bopt','copt']
 
             p_ys = np.nan_to_num(rate)
@@ -1527,11 +1582,12 @@ class NonlinInst(dj.Computed):
             fig, ax = plt.subplots()
             fig.tight_layout()
             fig.subplots_adjust(top=.88)
-            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12)
-            ax.plot(s1d, f)
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
+            ax.plot(s1d, f,label='fit')
             ax.set_xlabel('projection onto STA axis')
             ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
             plt.locator_params(nbins=4)
+            ax.legend()
 
             plt.suptitle('Instantaneous Non-Linearity Estimate\n' + str(
                 exp_date) + ': ' + eye + ': ' + fname,
