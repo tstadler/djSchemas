@@ -1525,6 +1525,7 @@ class NonlinInstExp(dj.Computed):
     aopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
     bopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
     copt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    res     :double     # absolute residuals
 
     """
 
@@ -1543,10 +1544,13 @@ class NonlinInstExp(dj.Computed):
 
         aopt, bopt, copt = popt
 
+        res = abs(self.non_lin_exp(s1d[p_ys != 0], aopt, bopt, copt) - p_ys[p_ys != 0]).sum()
+
         self.insert1(dict(key,
                           aopt=aopt,
                           bopt=bopt,
-                          copt=copt))
+                          copt=copt,
+                          res = res))
 
 
     def non_lin_exp(self,x,a,b,c):
@@ -1573,7 +1577,8 @@ class NonlinInstExp(dj.Computed):
             eye = (Experiment() & key).fetch1['eye']
 
             s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
-            aopt,bopt,copt = (self & key).fetch1['aopt','bopt','copt']
+            aopt,bopt,copt,res = (self & key).fetch1['aopt','bopt','copt','res']
+
 
             p_ys = np.nan_to_num(rate)
             f = self.non_lin_exp(s1d,aopt,bopt,copt)
@@ -1588,7 +1593,7 @@ class NonlinInstExp(dj.Computed):
             plt.locator_params(nbins=4)
             ax.legend()
 
-            plt.suptitle('Instantaneous Non-Linearity Estimate\n' + str(
+            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.2f\n'%(res) + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
