@@ -1333,12 +1333,14 @@ class Stc(dj.Computed):
             fig.subplots_adjust(top=.88)
 
             for tau in range(nt):
-                ax.plot(stc_ev[:,tau],'o',label='$\\tau$ %.0f'%-(-delta_future + tau * kt))
+                ax.plot(stc_ev[:,tau],'o',label='$\\tau$: %.0f'%-(-delta_future + tau * kt))
 
+            ax.set_xlim([-1,ns+1])
             ax.set_xlabel('# Eigenvalue')
             ax.set_ylabel('Variance')
             ax.locator_params(nbins=5)
             ax.legend()
+
 
             plt.suptitle('Eigenvalues of STC for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
@@ -1803,6 +1805,121 @@ class NonlinInstThreshold(dj.Computed):
                          fontsize=16)
 
             return fig
+
+
+@schema
+class StcInst(dj.Computed):
+    definition="""
+    ->StimInst
+    ->StaInst
+    ---
+    stc_inst        :longblob
+    stc_highvar     :longblob
+    stc_lowvar      :longblob
+    stc_ev          :longblob
+    """
+
+    def _make_tuples(self,key):
+
+
+        ntrigger = (Trigger() & key).fetch1['ntrigger']
+        y,sta_inst = (StaInst() & key).fetch1['y','sta_inst']
+        s_inst = (StimInst() & key).fetch1['s_inst']
+        ste_inst = []
+
+        for t in range(ntrigger):
+            if y[t] != 0:
+                for sp in range(y[t]):
+                    ste_inst.append(s_inst[:, t])
+        ste_inst = np.array(ste_inst)
+
+        stc = np.dot((ste_inst - sta_inst).T, (ste_inst - sta_inst)) / y.sum()
+
+        ev, evec = np.linalg.eig(stc)
+
+        fig = plt.figure()
+
+        plt.plot(ev, 'o')
+        plt.xlabel('# Eigenvector')
+        plt.ylabel('Variance')
+
+        display(fig)
+
+        highvar = float(input('Set ev threshold for high variance components'))
+        stc_highvar = []
+        for e in np.where(ev > highvar)[0]:
+            stc_highvar.append(evec[:, e].astype(float))
+        stc_highvar = np.array(stc_highvar)
+
+        lowvar = float(input('Set ev threshold for low variance components'))
+        stc_lowvar = []
+        for e in np.where(ev < lowvar)[0]:
+            stc_lowvar.append(evec[:, e].astype(float))
+        stc_lowvar = np.array(stc_lowvar)
+
+        self.insert1(dict(key,
+                            stc_inst = stc,
+                            stc_highvar = stc_highvar,
+                            stc_lowvar = stc_lowvar,
+                            stc_ev = ev
+                            ))
+
+    def plt_highvar(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            ns_x,ns_y = (Stim() & key).fetch1['ns_x','ns_y']
+            sta_inst = (StaInst() & key).fetch1['sta_inst']
+
+            stc_highvar = (self & key).fetch1['stc_highvar']
+
+
+
+            for e in range(stc_highvar.shape[0]):
+                fig, ax = plt.subplots(1, 2)
+                im0 = ax[0].imshow(sta_inst.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest')
+                cbar = plt.colorbar(im0, ax=ax[0], shrink=.8)
+                tick_locator = ticker.MaxNLocator(nbins=5)
+                cbar.locator = tick_locator
+                cbar.update_ticks()
+
+                ax[0].set_title('$w_{STA}$', fontsize=20, y=1.02)
+
+                im1 = ax[1].imshow(stc_highvar[e, :].reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest')
+                cbar = plt.colorbar(im1, ax=ax[1], shrink=.8)
+                tick_locator = ticker.MaxNLocator(nbins=5)
+                cbar.locator = tick_locator
+                cbar.update_ticks()
+
+                ax[1].set_title('$w_{STC}^{high var}$', fontsize=20, y=1.02)
+
+                fig.subplots_adjust(top=.88)
+                plt.suptitle('High Var Components of instantaneous STC\n' + str(
+                    exp_date) + ': ' + eye + ': ' + fname,
+                             fontsize=16)
+                return fig
+
+
+
+
+
+
 
 
 
