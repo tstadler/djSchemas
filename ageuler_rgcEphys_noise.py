@@ -1813,7 +1813,7 @@ class StcInst(dj.Computed):
     ->StimInst
     ->StaInst
     ---
-    stc_inst        :longblob
+    stc_triu        :longblob
     """
 
     def _make_tuples(self,key):
@@ -1832,10 +1832,12 @@ class StcInst(dj.Computed):
 
         stc = np.dot((ste_inst - sta_inst).T, (ste_inst - sta_inst)) / y.sum()
 
+        stc_triu = stc[np.triu_indices_from(stc)]
+
 
 
         self.insert1(dict(key,
-                            stc_inst = stc[np.triu_indices_from(stc)]
+                            stc_triu = stc_triu
                             ))
 
 
@@ -1855,7 +1857,15 @@ class StcInstPca(dj.Computed):
 
     def _make_tuples(self,key):
 
-        stc = (StcInst() & key).fetch1['stc_inst']
+        ns_x, ns_y = (Stim() & key).fetch1['ns_x','ns_y']
+        stc_triu = (StcInst() & key).fetch1['stc_triu']
+
+        ns = ns_y*ns_y
+
+        stc = np.zeros((ns, ns))
+        inds = np.triu_indices_from(stc)
+        stc[inds] = stc_triu
+        stc[inds[1], inds[0]] = stc_triu
 
         ev, evec = np.linalg.eig(stc)
 
