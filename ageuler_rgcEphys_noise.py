@@ -1230,6 +1230,7 @@ class Stc(dj.Computed):
 
         for key in self.project().fetch.as_dict:
 
+
             fname = key['filename']
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
@@ -1301,6 +1302,48 @@ class Stc(dj.Computed):
             plt.suptitle('First PC of spacetime STC\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
+
+    def plt_eigenvalues(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            delta_future, delta_past = (Sta() & key).fetch1['tfuture', 'tpast']
+
+            stc_ev = (self & key).fetch1['stc_ev']
+            ns,nt = stc_ev.shape
+
+            kt = (delta_past + delta_future) / nt
+
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            for tau in range(nt):
+                ax.plot(stc_ev[:,tau],'o',label='$\\tau$ %.0f'%-(-delta_future + tau * kt))
+
+            ax.set_xlabel('# Eigenvalue')
+            ax.set_ylabel('Variance')
+            ax.locator_params(nbins=5)
+            ax.legend()
+
+            plt.suptitle('Eigenvalues of STC for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+            return fig
+
 
 
 
