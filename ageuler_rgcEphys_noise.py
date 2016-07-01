@@ -1814,9 +1814,6 @@ class StcInst(dj.Computed):
     ->StaInst
     ---
     stc_inst        :longblob
-    stc_highvar     :longblob
-    stc_lowvar      :longblob
-    stc_ev          :longblob
     """
 
     def _make_tuples(self,key):
@@ -1834,6 +1831,31 @@ class StcInst(dj.Computed):
         ste_inst = np.array(ste_inst)
 
         stc = np.dot((ste_inst - sta_inst).T, (ste_inst - sta_inst)) / y.sum()
+
+
+
+        self.insert1(dict(key,
+                            stc_inst = stc
+                            ))
+
+
+
+
+
+
+@schema
+class StcInstPca(dj.Computed):
+    definition="""
+    ->StcInst
+    ---
+    stc_highvar     :longblob
+    stc_lowvar      :longblob
+    stc_ev          :longblob
+    """
+
+    def _make_tuples(self,key):
+
+        stc = (StcInst() & key).fetch1['stc_inst']
 
         ev, evec = np.linalg.eig(stc)
 
@@ -1858,14 +1880,13 @@ class StcInst(dj.Computed):
         stc_lowvar = np.array(stc_lowvar)
 
         self.insert1(dict(key,
-                            stc_inst = stc,
-                            stc_highvar = stc_highvar,
-                            stc_lowvar = stc_lowvar,
-                            stc_ev = ev
-                            ))
+                          stc_highvar=stc_highvar,
+                          stc_lowvar=stc_lowvar,
+                          stc_ev=ev
+                          ))
+
 
     def plt_highvar(self):
-
         plt.rcParams.update(
             {'figure.figsize': (15, 8),
              'axes.titlesize': 16,
@@ -1884,12 +1905,10 @@ class StcInst(dj.Computed):
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
 
-            ns_x,ns_y = (Stim() & key).fetch1['ns_x','ns_y']
+            ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
             sta_inst = (StaInst() & key).fetch1['sta_inst']
 
             stc_highvar = (self & key).fetch1['stc_highvar']
-
-
 
             for e in range(stc_highvar.shape[0]):
                 fig, ax = plt.subplots(1, 2)
@@ -1914,9 +1933,6 @@ class StcInst(dj.Computed):
                     exp_date) + ': ' + eye + ': ' + fname,
                              fontsize=16)
                 return fig
-
-
-
 
 
 
