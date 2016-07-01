@@ -1835,7 +1835,7 @@ class StcInst(dj.Computed):
 
 
         self.insert1(dict(key,
-                            stc_inst = stc
+                            stc_inst = stc[np.triu_indices_from(stc)]
                             ))
 
 
