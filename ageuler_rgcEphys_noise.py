@@ -1521,7 +1521,6 @@ class NonlinInst(dj.Computed):
 class NonlinInstExp(dj.Computed):
     definition = """
     -> NonlinInst
-    ->
     ---
     aopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
     bopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
