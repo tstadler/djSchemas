@@ -1531,7 +1531,7 @@ class NonlinInstExp(dj.Computed):
 
     def _make_tuples(self, key):
 
-
+        nspikes = (Spikes() & key).fetch1['nspikes']
         s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
         p_ys = np.nan_to_num(rate)
 
@@ -1544,7 +1544,7 @@ class NonlinInstExp(dj.Computed):
 
         aopt, bopt, copt = popt
 
-        res = abs(self.non_lin_exp(s1d[p_ys != 0], aopt, bopt, copt) - p_ys[p_ys != 0]).sum()
+        res = abs(self.non_lin_exp(s1d[p_ys != 0], aopt, bopt, copt) - p_ys[p_ys != 0]).sum()/nspikes
 
         self.insert1(dict(key,
                           aopt=aopt,
