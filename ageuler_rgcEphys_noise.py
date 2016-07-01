@@ -1531,7 +1531,7 @@ class NonlinInstExp(dj.Computed):
     def _make_tuples(self, key):
 
 
-        s1d,rate = (NonlinInst & key).fetch1['s1d_sta','rate']
+        s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
         p_ys = np.nan_to_num(rate)
 
         try:
