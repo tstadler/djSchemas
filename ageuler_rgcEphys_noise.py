@@ -1593,12 +1593,173 @@ class NonlinInstExp(dj.Computed):
             plt.locator_params(nbins=4)
             ax.legend()
 
-            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.2f\n'%(res) + str(
+            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
             return fig
 
+@schema
+class NonlinInstSoftmax(dj.Computed):
+    definition = """
+    -> NonlinInst
+    ---
+    aopt    :double     # parameter fit for softmax func as instantaneous non-linearity
+    topt    :double     # parameter fit for softmax func as instantaneous non-linearity
+    res     :double     # absolute residuals
+
+    """
+
+    def _make_tuples(self, key):
+
+        nspikes = (Spikes() & key).fetch1['nspikes']
+        s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+        p_ys = np.nan_to_num(rate)
+
+        try:
+            popt, pcov = scoptimize.curve_fit(self.softmax, s1d[p_ys != 0], p_ys[p_ys != 0])
+
+        except Exception as e1:
+            print('Exponential fit failed due to:\n', e1)
+            popt=(0,0)
+
+        aopt, topt = popt
+
+        res = abs(self.softmax(s1d[p_ys!=0],aopt,topt) - p_ys[p_ys!=0]).sum()/nspikes
+
+        self.insert1(dict(key,
+                          aopt=aopt,
+                          topt = topt,
+                          res = res))
+
+    def softmax(x, a, t):
+        ex = np.exp(x - a) / t
+        sm = ex / ex.sum()
+
+        return sm
+
+    def plt_rate(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+            aopt,topt,res = (self & key).fetch1['aopt','topt','res']
+
+
+            p_ys = np.nan_to_num(rate)
+            f = self.softmax(s1d,aopt,topt)
+
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
+            ax.plot(s1d, f,label='fit')
+            ax.set_xlabel('projection onto STA axis')
+            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
+            plt.locator_params(nbins=4)
+            ax.legend()
+
+            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+@schema
+class NonlinInstThreshold(dj.Computed):
+    definition = """
+    -> NonlinInst
+    ---
+    aopt    :double     # parameter fit for piecewise threshold func as instantaneous non-linearity
+    thropt  :double   # parameter fit for piecewise threshold func as instantaneous non-linearity
+    res     :double     # absolute residuals
+
+    """
+
+    def _make_tuples(self, key):
+
+        nspikes = (Spikes() & key).fetch1['nspikes']
+        s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+        p_ys = np.nan_to_num(rate)
+
+        try:
+            popt, pcov = scoptimize.curve_fit(self.threshold, s1d[p_ys != 0], p_ys[p_ys != 0])
+
+        except Exception as e1:
+            print('Exponential fit failed due to:\n', e1)
+            popt=(0,0)
+
+        aopt, thropt = popt
+
+        res = abs(self.threshold(s1d[p_ys!=0],aopt,thropt) - p_ys[p_ys!=0]).sum()/nspikes
+
+        self.insert1(dict(key,
+                          aopt=aopt,
+                          thropt = thropt,
+                          res = res))
+
+    def threshold(x, a, thr):
+
+        return np.piecewise(x, [x < thr, x >= thr], [0, lambda x: a * x])
+
+    def plt_rate(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+            aopt,thropt,res = (self & key).fetch1['aopt','topt','res']
+
+
+            p_ys = np.nan_to_num(rate)
+            f = self.threshold(s1d,aopt,thropt)
+
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
+            ax.plot(s1d, f,label='fit')
+            ax.set_xlabel('projection onto STA axis')
+            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
+            plt.locator_params(nbins=4)
+            ax.legend()
+
+            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
 
 
 
