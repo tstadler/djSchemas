@@ -917,7 +917,7 @@ class Sta(dj.Computed):
             cbar.locator = tick_locator
             cbar.update_ticks()
 
-            fig.tight_layout()
+            #fig.tight_layout()
             fig.subplots_adjust(top=.88)
 
             plt.suptitle('STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
@@ -971,7 +971,7 @@ class Sta(dj.Computed):
             cbar.locator = tick_locator
             cbar.update_ticks()
 
-            fig.tight_layout()
+            #fig.tight_layout()
             fig.subplots_adjust(top=.88)
             plt.suptitle('Normalized STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
@@ -1025,7 +1025,7 @@ class Sta(dj.Computed):
             cbar.locator = tick_locator
             cbar.update_ticks()
 
-            fig.tight_layout()
+            #fig.tight_layout()
             fig.subplots_adjust(top=.88)
             plt.suptitle('Standard deviation of STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
@@ -1152,8 +1152,8 @@ class Sta(dj.Computed):
             ax.set_yticks(np.linspace(4, nt * 10 - 4, nt))
             ax.set_yticklabels(np.linspace(-delta_past + delta_future, delta_future, nt).astype(int))
 
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88,left=.1)
+            #fig.tight_layout()
+            fig.subplots_adjust(top=.88)
 
             plt.suptitle('Spacetime STA\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
@@ -1272,8 +1272,8 @@ class Stc(dj.Computed):
             cbar.locator = tick_locator
             cbar.update_ticks()
 
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88,left=.1)
+            #fig.tight_layout()
+            fig.subplots_adjust(top=.88)
             plt.suptitle('First PC of STC for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
@@ -1311,7 +1311,7 @@ class Stc(dj.Computed):
             ax.set_yticklabels(np.linspace(-delta_past + delta_future, delta_future, nt).astype(int))
 
             fig.tight_layout()
-            fig.subplots_adjust(top=.88)
+
             plt.suptitle('First PC of spacetime STC\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
@@ -1961,7 +1961,7 @@ class StcInstPca(dj.Computed):
                 cbar.locator = tick_locator
                 cbar.update_ticks()
 
-                ax[1].set_title('$w_{STC}^{high var}$\n $\\sigma$: %.1f'%stc_ev[e])
+                ax[1].set_title('$w_{STC}^{high var},\; \\sigma$: %.1f'%stc_ev[e])
                 ax[1].set_xticklabels([])
                 ax[1].set_yticklabels([])
                 fig.tight_layout()
