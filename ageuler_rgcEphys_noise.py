@@ -1124,7 +1124,7 @@ class Sta(dj.Computed):
     def plt_spacetime(self):
 
         plt.rcParams.update(
-            {'figure.figsize': (15, 8),
+            {'figure.figsize': (12, 8),
              'axes.titlesize': 16,
              'axes.labelsize': 16,
              'xtick.labelsize': 16,
@@ -1153,7 +1153,7 @@ class Sta(dj.Computed):
             ax.set_yticklabels(np.linspace(-delta_past + delta_future, delta_future, nt).astype(int))
 
             fig.tight_layout()
-            fig.subplots_adjust(top=.88)
+            fig.subplots_adjust(top=.88,left=.1)
 
             plt.suptitle('Spacetime STA\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
@@ -1273,7 +1273,7 @@ class Stc(dj.Computed):
             cbar.update_ticks()
 
             fig.tight_layout()
-            fig.subplots_adjust(top=.88)
+            fig.subplots_adjust(top=.88,left=.1)
             plt.suptitle('First PC of STC for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
@@ -1319,7 +1319,7 @@ class Stc(dj.Computed):
     def plt_eigenvalues(self):
 
         plt.rcParams.update(
-            {'figure.figsize': (15, 8),
+            {'figure.figsize': (12, 6),
              'axes.titlesize': 16,
              'axes.labelsize': 16,
              'xtick.labelsize': 16,
@@ -1498,7 +1498,7 @@ class NonlinInst(dj.Computed):
     def plt_1dhistograms(self):
 
         plt.rcParams.update(
-            {'figure.figsize': (15, 8),
+            {'figure.figsize': (12, 6),
              'axes.titlesize': 16,
              'axes.labelsize': 16,
              'xtick.labelsize': 16,
@@ -1564,12 +1564,14 @@ class NonlinInst(dj.Computed):
             p_ys = np.nan_to_num(rate)
 
             fig, ax = plt.subplots()
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88)
+
             ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12)
             ax.set_xlabel('projection onto STA axis')
             ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
             plt.locator_params(nbins=4)
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88,left=.1)
 
             plt.suptitle('Ratio between STE and RSE densities\n' + str(
                 exp_date) + ': ' + eye + ': ' + fname,
@@ -1644,8 +1646,7 @@ class NonlinInstExp(dj.Computed):
             f = self.non_lin_exp(s1d,aopt,bopt,copt)
 
             fig, ax = plt.subplots()
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88)
+
             ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
             ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
             ax.set_xlabel('projection onto STA axis')
@@ -1729,8 +1730,7 @@ class NonlinInstSoftmax(dj.Computed):
             f = self.softmax(s1d,aopt,topt)
 
             fig, ax = plt.subplots()
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88)
+
             ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
             ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
             ax.set_xlabel('projection onto STA axis')
@@ -1739,7 +1739,7 @@ class NonlinInstSoftmax(dj.Computed):
             ax.legend()
 
             fig.tight_layout()
-            fig.subplots_adjust(top=.88)
+            fig.subplots_adjust(top=.88,left=.1)
             plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
@@ -1811,8 +1811,7 @@ class NonlinInstThreshold(dj.Computed):
             f = self.threshold(s1d,aopt,thropt)
 
             fig, ax = plt.subplots()
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88)
+
             ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
             ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
             ax.set_xlabel('projection onto STA axis')
@@ -1821,7 +1820,7 @@ class NonlinInstThreshold(dj.Computed):
             ax.legend()
 
             fig.tight_layout()
-            fig.subplots_adjust(top=.88)
+            fig.subplots_adjust(top=.88,left=.1)
 
             plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
                 exp_date) + ': ' + eye + ': ' + fname,
@@ -1951,6 +1950,8 @@ class StcInstPca(dj.Computed):
                 tick_locator = ticker.MaxNLocator(nbins=5)
                 cbar.locator = tick_locator
                 cbar.update_ticks()
+                ax[0].set_xticklabels([])
+                ax[0].set_yticklabels([])
 
                 ax[0].set_title('$w_{STA}$')
 
@@ -1961,7 +1962,8 @@ class StcInstPca(dj.Computed):
                 cbar.update_ticks()
 
                 ax[1].set_title('$w_{STC}^{high var}$\n $\\sigma$: %.1f'%stc_ev[e])
-
+                ax[1].set_xticklabels([])
+                ax[1].set_yticklabels([])
                 fig.tight_layout()
                 fig.subplots_adjust(top=.88)
 
@@ -1969,14 +1971,6 @@ class StcInstPca(dj.Computed):
                     exp_date) + ': ' + eye + ': ' + fname,
                              fontsize=16)
                 return fig
-
-
-
-
-
-
-
-
 
 
 
