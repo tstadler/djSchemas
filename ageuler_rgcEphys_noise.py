@@ -917,6 +917,9 @@ class Sta(dj.Computed):
             cbar.locator = tick_locator
             cbar.update_ticks()
 
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
             plt.suptitle('STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
@@ -968,6 +971,8 @@ class Sta(dj.Computed):
             cbar.locator = tick_locator
             cbar.update_ticks()
 
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
             plt.suptitle('Normalized STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
@@ -1020,6 +1025,8 @@ class Sta(dj.Computed):
             cbar.locator = tick_locator
             cbar.update_ticks()
 
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
             plt.suptitle('Standard deviation of STA for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
@@ -1138,14 +1145,16 @@ class Sta(dj.Computed):
             ns, nt = sta.shape
 
             fig, ax = plt.subplots()
-            fig.tight_layout()
 
             ax.imshow(np.repeat(sta, 10, axis=1).T[::-1], cmap=plt.cm.coolwarm)
             ax.set_xlabel('space')
             ax.set_ylabel('time [ms]', labelpad=20)
             ax.set_yticks(np.linspace(4, nt * 10 - 4, nt))
             ax.set_yticklabels(np.linspace(-delta_past + delta_future, delta_future, nt).astype(int))
-            #fig.subplots_adjust(top=.9)
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
             plt.suptitle('Spacetime STA\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
@@ -1263,6 +1272,8 @@ class Stc(dj.Computed):
             cbar.locator = tick_locator
             cbar.update_ticks()
 
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
             plt.suptitle('First PC of STC for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
@@ -1298,7 +1309,9 @@ class Stc(dj.Computed):
             ax.set_ylabel('time [ms]', labelpad=20)
             ax.set_yticks(np.linspace(4, nt * 10 - 4, nt))
             ax.set_yticklabels(np.linspace(-delta_past + delta_future, delta_future, nt).astype(int))
-            # fig.subplots_adjust(top=.9)
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
             plt.suptitle('First PC of spacetime STC\n' + str(exp_date) + ': ' + eye + ': ' + fname, fontsize=16)
 
             return fig
@@ -1328,12 +1341,13 @@ class Stc(dj.Computed):
 
             kt = (delta_past + delta_future) / nt
 
+            pals = sns.cubehelix_palette(nt, start=.2, rot=-1)
+
             fig, ax = plt.subplots()
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88)
+
 
             for tau in range(nt):
-                ax.plot(stc_ev[:,tau],'o',label='$\\tau$: %.0f'%-(-delta_future + tau * kt))
+                ax.plot(stc_ev[:,tau],'o',label='$\\tau$: %.0f'%-(-delta_future + tau * kt),color=pals[tau])
 
             ax.set_xlim([-1,ns+1])
             ax.set_xlabel('# Eigenvalue')
@@ -1341,7 +1355,8 @@ class Stc(dj.Computed):
             ax.locator_params(nbins=5)
             ax.legend()
 
-
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
             plt.suptitle('Eigenvalues of STC for different time lags\n' + str(exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
             return fig
@@ -1632,11 +1647,14 @@ class NonlinInstExp(dj.Computed):
             fig.tight_layout()
             fig.subplots_adjust(top=.88)
             ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
-            ax.plot(s1d, f,label='fit')
+            ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
             ax.set_xlabel('projection onto STA axis')
             ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
             plt.locator_params(nbins=4)
             ax.legend()
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
 
             plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
                 exp_date) + ': ' + eye + ': ' + fname,
@@ -1714,12 +1732,14 @@ class NonlinInstSoftmax(dj.Computed):
             fig.tight_layout()
             fig.subplots_adjust(top=.88)
             ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
-            ax.plot(s1d, f,label='fit')
+            ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
             ax.set_xlabel('projection onto STA axis')
             ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
             plt.locator_params(nbins=4)
             ax.legend()
 
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
             plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
@@ -1794,11 +1814,14 @@ class NonlinInstThreshold(dj.Computed):
             fig.tight_layout()
             fig.subplots_adjust(top=.88)
             ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
-            ax.plot(s1d, f,label='fit')
+            ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
             ax.set_xlabel('projection onto STA axis')
             ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
             plt.locator_params(nbins=4)
             ax.legend()
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
 
             plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
                 exp_date) + ': ' + eye + ': ' + fname,
@@ -1869,7 +1892,7 @@ class StcInstPca(dj.Computed):
 
         ev, evec = np.linalg.eig(stc_new)
 
-        fig = plt.figure()
+        fig = plt.figure(figsize=(8,6))
 
         plt.plot(ev, 'o')
         plt.xlabel('# Eigenvector')
@@ -1919,6 +1942,7 @@ class StcInstPca(dj.Computed):
             sta_inst = (StaInst() & key).fetch1['sta_inst']
 
             stc_highvar = (self & key).fetch1['stc_highvar']
+            stc_ev = (self & key).fetch1['stc_ev']
 
             for e in range(stc_highvar.shape[0]):
                 fig, ax = plt.subplots(1, 2)
@@ -1928,7 +1952,7 @@ class StcInstPca(dj.Computed):
                 cbar.locator = tick_locator
                 cbar.update_ticks()
 
-                ax[0].set_title('$w_{STA}$', fontsize=20, y=1.02)
+                ax[0].set_title('$w_{STA}$')
 
                 im1 = ax[1].imshow(stc_highvar[e, :].reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest')
                 cbar = plt.colorbar(im1, ax=ax[1], shrink=.8)
@@ -1936,9 +1960,11 @@ class StcInstPca(dj.Computed):
                 cbar.locator = tick_locator
                 cbar.update_ticks()
 
-                ax[1].set_title('$w_{STC}^{high var}$', fontsize=20, y=1.02)
+                ax[1].set_title('$w_{STC}^{high var}$\n $\\sigma$: %.1f'%stc_ev[e])
 
+                fig.tight_layout()
                 fig.subplots_adjust(top=.88)
+
                 plt.suptitle('High Var Components of instantaneous STC\n' + str(
                     exp_date) + ': ' + eye + ': ' + fname,
                              fontsize=16)
