@@ -2187,7 +2187,7 @@ class StaInstRidge(dj.Computed):
 
             fig, ax = plt.subplots(1, 2)
 
-            im0 = ax[0].imshow(sta_inst.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest')
+            im0 = ax[0].imshow(sta_inst/abs(sta_inst).max().reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest',clim=(-1,1))
             cbar = plt.colorbar(im0, ax=ax[0], shrink=.8)
             tick_locator = ticker.MaxNLocator(nbins=4)
             cbar.locator = tick_locator
@@ -2197,7 +2197,7 @@ class StaInstRidge(dj.Computed):
             ax[0].set_xticklabels([])
             ax[0].set_yticklabels([])
 
-            im1 = ax[1].imshow(sta_inst_ridge.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest')
+            im1 = ax[1].imshow(sta_inst_ridge/abs(sta_inst_ridge).max().reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest',clim=(-1,1))
             cbar = plt.colorbar(im1, ax=ax[1], shrink=.8)
             tick_locator = ticker.MaxNLocator(nbins=4)
             cbar.locator = tick_locator
