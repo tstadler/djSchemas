@@ -2183,11 +2183,17 @@ class StaInstRidge(dj.Computed):
             ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
             sta_inst = (StaInst() & key).fetch1['sta_inst']
 
+            # Normalize
+            w_sta = sta_inst / abs(sta_inst).max()
+
             sta_inst_ridge, theta_ridge = (self & key).fetch1['sta_inst_ridge','theta_ridge']
+
+            # Normliaze
+            w_ridge = sta_inst_ridge / abs(sta_inst_ridge).max()
 
             fig, ax = plt.subplots(1, 2)
 
-            im0 = ax[0].imshow(sta_inst/abs(sta_inst).max().reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest',clim=(-1,1))
+            im0 = ax[0].imshow(w_sta.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest',clim=(-1,1))
             cbar = plt.colorbar(im0, ax=ax[0], shrink=.8)
             tick_locator = ticker.MaxNLocator(nbins=4)
             cbar.locator = tick_locator
@@ -2197,7 +2203,7 @@ class StaInstRidge(dj.Computed):
             ax[0].set_xticklabels([])
             ax[0].set_yticklabels([])
 
-            im1 = ax[1].imshow(sta_inst_ridge/abs(sta_inst_ridge).max().reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest',clim=(-1,1))
+            im1 = ax[1].imshow(w_ridge.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest',clim=(-1,1))
             cbar = plt.colorbar(im1, ax=ax[1], shrink=.8)
             tick_locator = ticker.MaxNLocator(nbins=4)
             cbar.locator = tick_locator
