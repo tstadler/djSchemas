@@ -2081,7 +2081,7 @@ class StaInstRidge(dj.Computed):
         log_e_list.append(self.log_e_ridge(sigma_r[it], theta_r[it], s, y))
 
         dellog_e = 1000
-        eps= 1
+        eps= 10
 
         # Fixed-point iteration, iter until convergence
 
