@@ -2078,7 +2078,7 @@ class StaInstRidge(dj.Computed):
 
         c_prior_it, c_post_it, m_post_it = self.params_ridge(theta_r[it], sigma_r[it], s, y)
 
-        log_e_list.append(self.log_e_ridge(sigma_r[it], theta_r[it], s, y))
+        log_e_list.append(self.log_e_ridge(theta_r[it], sigma_r[it], s, y))
 
         dellog_e = 1000
         eps= 10
@@ -2099,7 +2099,7 @@ class StaInstRidge(dj.Computed):
 
             c_prior_it, c_post_it, m_post_it = self.params_ridge(theta_r[it], sigma_r[it], s, y)
 
-            log_e_list.append(self.log_e_ridge(sigma_r[it], theta_r[it], s, y))
+            log_e_list.append(self.log_e_ridge(theta_r[it], sigma_r[it], s, y))
 
             dellog_e = abs(log_e_list[it]) - abs(log_e_list[it - 1])
 
