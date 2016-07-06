@@ -2029,6 +2029,44 @@ class StcInstPca(dj.Computed):
                              fontsize=16)
                 return fig
 
+
+    def plt_ev(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            ev = (self & key).fetch1['stc_ev']
+
+            fig = plt.figure(figsize=(8, 6))
+
+            plt.plot(ev, 'o')
+            plt.xlabel('# Eigenvector')
+            plt.ylabel('Variance')
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            plt.suptitle('Eigenvalues of instantaneous STC\n' + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+            return fig
+
+
+
 @schema
 class StaInstRidge(dj.Computed):
     definition="""
