@@ -2406,6 +2406,54 @@ class StaInstArd(dj.Computed):
 
             return fig
 
+    def plt_cprior(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            theta = (self & key).fetch1['theta_ard']
+
+            c_prior = np.diag(1/theta)
+
+            fig, ax = plt.subplots()
+
+            im = ax.imshow(c_prior,cmap = plt.cm.Greys_r)
+            cbar = plt.colorbar(im, shrink=.9)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            ax.set_yticks([])
+            ax.set_xticks([])
+            ax.set_xticklabels()
+            ax.set_yticklabels()
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            plt.suptitle('Prior ARD covariance matrix\n' + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+
+
 
 
 
