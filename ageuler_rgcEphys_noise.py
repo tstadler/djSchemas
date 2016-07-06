@@ -2049,12 +2049,12 @@ class StaInstRidge(dj.Computed):
 
         s = s_inst[:,0:ntrigger]
 
-        ns = s.shape[0]
-        T = s.shape[1]
-
+        # Init
         theta0 = 1e-6
         sigma0 = np.square(y - np.dot(w_sta, s)).sum() / ntrigger
 
+        ns = s.shape[0]
+        T = s.shape[1]
 
         c_prior0, c_post0, m_post0 = self.params_ridge(theta0, sigma0, s, y)
 
@@ -2067,6 +2067,7 @@ class StaInstRidge(dj.Computed):
         # First iter
 
         # Update hyperparams
+        print('Iter: ', it)
 
         theta_r.append((ns - theta0 * np.matrix.trace(c_post0)) / np.square(m_post0).sum())
 
@@ -2081,7 +2082,7 @@ class StaInstRidge(dj.Computed):
         log_e_list.append(self.log_e_ridge(theta_r[it], sigma_r[it], s, y))
 
         dellog_e = 1000
-        eps= 10
+        eps = 10
 
         # Fixed-point iteration, iter until convergence
 
@@ -2127,7 +2128,8 @@ class StaInstRidge(dj.Computed):
             :return log_e: scalar with sign* log-evidence of a fully Gaussian model
         """
 
-        T = int(len(y))
+        ns = s.shape[0]
+        T = s.shape[1]
 
         c_prior, c_post, m_post = self.params_ridge(theta, sigma, s, y)
 
@@ -2150,8 +2152,9 @@ class StaInstRidge(dj.Computed):
         :param y: array spike counts vector as array (T x 1)
         :return: c_prior,c_post, m_post
         """
-        ns = s.shape[0]
 
+        ns = s.shape[0]
+        T = s.shape[1]
 
         c_prior = np.eye(ns, ns) / theta
 
@@ -2222,6 +2225,190 @@ class StaInstRidge(dj.Computed):
                          fontsize=16)
 
             return fig
+
+
+@schema
+class StaInstArd(dj.Computed):
+    definition="""
+    ->StaInst
+    ->StimInst
+    ---
+    sta_inst_ard  :longblob   # instantaneous RF MAP estimator in a linear gaussian encoding model with ard prior covariance matrix
+    theta_ard     :longblob   # optimal hyperparameter with maximum log-evidence
+    sigma_ard     :double     # encoding noise variance treated as hyperparameter
+    log_e         :double     # log-evidence at maximum with optimal hyperparameter set
+    """
+
+    def _make_tuples(self, key):
+
+        s_inst = (StimInst() & key).fetch1['s_inst']
+        y, w_sta = (StaInst() & key).fetch1['y', 'sta_inst']
+        ntrigger = (Trigger() & key).fetch1['ntrigger']
+        theta_ridge,sigma_ridge = (StaInstRidge() & key).fetch1['theta_ridge','sigma_ridge']
+
+        s = s_inst[:, 0:ntrigger]
+
+        # Init
+
+
+        ns = s.shape[0]
+        T = s.shape[1]
+
+        theta0 = np.repeat(theta_ridge, ns)
+        sigma0 = sigma_ridge
+
+        c_prior0, c_post0, m_post0 = self.params_ard(theta0, sigma0, s, y)
+
+        theta_ard = []
+        sigma_ard = []
+        log_e_list = []
+        it = 0
+
+        ## Fixed point iteration converges faster than grad descent on log evidence
+        # First iter
+
+        # Update hyperparams
+        print('Iter: ', it)
+
+        theta_ard.append((1 - theta0 * np.diag(c_post0)) / np.square(m_post0))
+
+        h7 = y - np.dot(m_post0, s)
+        r2 = np.dot(h7, h7.T)
+        sigma_ard.append(r2 / (T - (1 - theta0 * np.diag(c_post0)).sum()))
+
+        # Update prior and posterior
+
+        c_prior_it, c_post_it, m_post_it = self.params_ard(theta_ard[it], sigma_ard[it], s, y)
+
+        log_e_list.append(self.log_e_ard(theta_ard[it], sigma_ard[it], s, y))
+
+        dellog_e = 1000
+        eps=10
+
+        # Fixed-point iteration, iter until convergence
+
+        while dellog_e > eps:
+            it += 1
+            print('Iter: ', it)
+
+            # Update hyperparams according to fixed point rule
+
+            theta_ard.append((1 - theta_ard[it - 1] * np.diag(c_post_it)) / np.square(m_post_it))
+
+            h7 = y - np.dot(m_post_it, s)
+            r2 = np.dot(h7, h7.T)
+            sigma_ard.append(r2 / (T - (1 - theta_ard[it - 1] * np.diag(c_post_it)).sum()))
+
+            c_prior_it, c_post_it, m_post_it = self.params_ard(theta_ard[it], sigma_ard[it], s, y)
+
+            log_e_list.append(self.log_e_ard(theta_ard[it], sigma_ard[it], s, y))
+
+            dellog_e = abs(log_e_list[it]) - abs(log_e_list[it - 1])
+
+            c_prior_ard, c_post_ard, m_post_ard = self.params_ard(theta_ard, sigma_ard, s, y)
+
+        self.insert1(dict(key,
+                          theta_ard=theta_ard[it],
+                          sigma_ard=sigma_ard[it],
+                          log_e=log_e_list[it],
+                          sta_inst_ard=m_post_ard))
+
+
+
+    def params_ard(self,theta, sigma, s, y):
+
+
+        ns = s.shape[0]
+        T = s.shape[1]
+
+        c_prior = np.diag(1 / theta)
+
+        c_post = np.linalg.inv((np.dot(s, s.T) / sigma + np.diag(theta) * np.eye(ns, ns)))
+
+        m_post = np.dot(c_post, np.dot(s, y)) / sigma
+
+        return c_prior, c_post, m_post
+
+    def log_e_ard(self,theta, sigma, s, y, sign=1):
+
+        ns = s.shape[0]
+        T = s.shape[1]
+
+        c_prior, c_post, m_post = self.params_ard(theta, sigma, s, y)
+
+        h3 = np.linalg.solve(c_post.T, c_prior.T).T
+        h4sign, h4 = np.linalg.slogdet(h3)
+        log_e = sign * (-T * np.log(abs(2 * np.pi * sigma)) / 2 - h4sign * h4 / 2 + np.dot(m_post.T, np.dot(c_post,
+                                                                                                            m_post)) / 2 - np.dot(
+            y.T, y) / (2 * sigma))
+
+        return log_e
+
+    def plt_sta(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
+            sta_inst = (StaInst() & key).fetch1['sta_inst']
+
+            # Normalize
+            w_sta = sta_inst / abs(sta_inst).max()
+
+            sta_inst_ard, sigma_ard = (self & key).fetch1['sta_inst_ard', 'sigma_ard']
+
+            # Normliaze
+            w_ard = sta_inst_ard / abs(sta_inst_ard).max()
+
+            fig, ax = plt.subplots(1, 2)
+
+            im0 = ax[0].imshow(w_sta.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest', clim=(-1, 1))
+            cbar = plt.colorbar(im0, ax=ax[0], shrink=.8)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            ax[0].set_title('$w_{MLE}$', y=1.02, fontsize=20)
+            ax[0].set_xticklabels([])
+            ax[0].set_yticklabels([])
+
+            im1 = ax[1].imshow(w_ard.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest', clim=(-1, 1))
+            cbar = plt.colorbar(im1, ax=ax[1], shrink=.8)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            ax[1].set_title('$w_{MAP}^{ridge},\; \\sigma^2 = $%.1f' % (sigma_ard), y=1.02, fontsize=20)
+            ax[1].set_xticklabels([])
+            ax[1].set_yticklabels([])
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.85)
+
+            plt.suptitle('Instantaneous STA with ARD Prior\n' + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+
+
+
 
 
 
