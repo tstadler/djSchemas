@@ -2393,7 +2393,7 @@ class StaInstArd(dj.Computed):
             cbar.locator = tick_locator
             cbar.update_ticks()
 
-            ax[1].set_title('$w_{MAP}^{ridge},\; \\sigma^2 = $%.1f' % (sigma_ard), y=1.02, fontsize=20)
+            ax[1].set_title('$w_{MAP}^{ARD},\; \\sigma^2 = $%.1f' % (sigma_ard), y=1.02, fontsize=20)
             ax[1].set_xticklabels([])
             ax[1].set_yticklabels([])
 
