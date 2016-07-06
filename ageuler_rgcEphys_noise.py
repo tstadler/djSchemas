@@ -2305,7 +2305,7 @@ class StaInstArd(dj.Computed):
 
             dellog_e = abs(log_e_list[it]) - abs(log_e_list[it - 1])
 
-            c_prior_ard, c_post_ard, m_post_ard = self.params_ard(theta_ard, sigma_ard, s, y)
+            c_prior_ard, c_post_ard, m_post_ard = self.params_ard(theta_ard[it], sigma_ard[it], s, y)
 
         self.insert1(dict(key,
                           theta_ard=theta_ard[it],
