@@ -2440,8 +2440,8 @@ class StaInstArd(dj.Computed):
 
             ax.set_yticks([])
             ax.set_xticks([])
-            ax.set_xticklabels()
-            ax.set_yticklabels()
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
 
             fig.tight_layout()
             fig.subplots_adjust(top=.88)
