@@ -2526,7 +2526,7 @@ class PredStaInst(dj.Computed):
         id_nl = res.argmin()
 
         if id_nl == 0:
-            aopt, bopt, copt = (NonlinInstExp & key).fetch1['aopt', 'bopt', 'copt']
+            aopt, bopt, copt = (NonlinInstExp() & key).fetch1['aopt', 'bopt', 'copt']
 
             def non_lin(x):
                 return aopt * np.exp(bopt * x) + copt
@@ -2534,7 +2534,7 @@ class PredStaInst(dj.Computed):
             nl_type = 'exp'
 
         elif id_nl == 1:
-            aopt, topt = (NonlinInstSoftmax & key).fetch1['aopt', 'topt']
+            aopt, topt = (NonlinInstSoftmax() & key).fetch1['aopt', 'topt']
 
             def non_lin(x):
                 ex = np.exp(x - aopt) /topt
@@ -2543,7 +2543,7 @@ class PredStaInst(dj.Computed):
             nl_type = 'sm'
 
         elif id_nl == 2:
-            aopt, topt = (NonlinInstThreshold & key).fetch1['aopt', 'thropt']
+            aopt, topt = (NonlinInstThreshold() & key).fetch1['aopt', 'thropt']
 
             def non_lin(x):
                 return np.piecewise(x, [x < topt, x >= topt], [0, lambda x: aopt * x])
