@@ -2631,7 +2631,7 @@ class PredStaInst(dj.Computed):
 
             w,y = (StaInst() & key).fetch1['sta_inst','y']
             r_all = (PredStaInst() & key).fetch1['r']
-            rho = (PredStaInst() & key).fetch1['rho']
+            rho,k_fold = (PredStaInst() & key).fetch1['rho','k']
 
             start = 200
             end = 400
@@ -2673,6 +2673,12 @@ class PredStaInst(dj.Computed):
             ax2.set_yticklabels([])
 
             ax2.locator_params(nbins=4)
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+            plt.suptitle('Instantaneous STA with k = %.0f cross-validation\n'%k_fold + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
 
             return  fig
 
