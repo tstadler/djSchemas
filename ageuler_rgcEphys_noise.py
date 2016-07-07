@@ -2659,7 +2659,7 @@ class PredStaInst(dj.Computed):
             ax1.set_xlim([start / freq, end / freq])
             ax1.set_ylabel('spike counts')
             ax1.legend()
-            ax1.set_title('rho = %.2f' %rho)
+            ax1.set_title('$\\rho$ = %.2f' %rho)
             ax1.locator_params(nbins=4)
             plt.setp(ax1.get_xticklabels(), visible=False)
             ax1.set_yticklabels([])
