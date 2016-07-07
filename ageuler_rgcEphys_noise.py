@@ -2459,7 +2459,7 @@ class NonlinInstExpRidge(dj.Computed):
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
 
-            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+            s1d,rate = (NonlinInstRidge() & key).fetch1['s1d_sta','rate']
             aopt,bopt,copt,res = (self & key).fetch1['aopt','bopt','copt','res']
 
 
@@ -2543,7 +2543,7 @@ class NonlinInstSoftmaxRidge(dj.Computed):
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
 
-            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+            s1d,rate = (NonlinInstRidge() & key).fetch1['s1d_sta','rate']
             aopt,topt,res = (self & key).fetch1['aopt','topt','res']
 
 
@@ -2624,7 +2624,7 @@ class NonlinInstThresholdRidge(dj.Computed):
             exp_date = (Experiment() & key).fetch1['exp_date']
             eye = (Experiment() & key).fetch1['eye']
 
-            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+            s1d,rate = (NonlinInstRidge() & key).fetch1['s1d_sta','rate']
             aopt,thropt,res = (self & key).fetch1['aopt','thropt','res']
 
 
