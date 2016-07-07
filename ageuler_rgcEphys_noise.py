@@ -2900,7 +2900,7 @@ class NonlinInstArd(dj.Computed):
         s_inst =(StimInst() & key).fetch1['s_inst']
         y = (StaInst() & key).fetch1['y']
 
-        w_sta = (StaInstArd() & key).fetch1['sta_inst_ridge']
+        w_sta = (StaInstArd() & key).fetch1['sta_inst_ard']
 
 
         rse1d = np.dot(w_sta, s_inst)
