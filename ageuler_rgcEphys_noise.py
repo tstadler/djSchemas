@@ -2637,7 +2637,7 @@ class PredStaInst(dj.Computed):
             end = 400
             t = np.linspace(start / freq, end / freq, end - start)
 
-            fig = plt.figure()
+
             gs1 = gridsp.GridSpec(2, 1)
             gs1.update(left=.05, right=.5)
             ax0 = plt.subplot(gs1[:, :])
@@ -2674,13 +2674,9 @@ class PredStaInst(dj.Computed):
 
             ax2.locator_params(nbins=4)
 
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88)
             plt.suptitle('Instantaneous STA with k = %.0f cross-validation\n'%k_fold + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
-
-            return  fig
 
 
 
