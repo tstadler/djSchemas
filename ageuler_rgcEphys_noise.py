@@ -2606,6 +2606,76 @@ class PredStaInst(dj.Computed):
                             nl_type = nl_type
         ))
 
+    def plt_pred(self,):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            freq = (StimMeta() & key).fetch1['freq']
+            ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
+
+            w,y = (StaInst() & key).fetch1['sta_inst','y']
+            r_all = (PredStaInst() & key).fetch1['r']
+            rho = (PredStaInst() & key).fetch1['rho']
+
+            start = 200
+            end = 400
+            t = np.linspace(start / freq, end / freq, end - start)
+
+            fig = plt.figure()
+            gs1 = gridsp.GridSpec(2, 1)
+            gs1.update(left=.05, right=.5)
+            ax0 = plt.subplot(gs1[:, :])
+            im = ax0.imshow(w.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm_r, interpolation='nearest')
+            cbar = plt.colorbar(im, ax=ax0, shrink=.88)
+            ax0.set_xticklabels([])
+            ax0.set_yticklabels([])
+            ax0.set_title('Instantaneous STA')
+            # cbar.set_label('stim intensity', labelpad=20, rotation=270)
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            gs2 = gridsp.GridSpec(2, 1)
+            gs2.update(left=.55, right=.95)
+            ax1 = plt.subplot(gs2[0, :])
+            # ax1.plot(t,y[start:end],label='prediction')
+            ax1.plot(t, y[start:end], label='data')
+            ax1.set_xlim([start / freq, end / freq])
+            ax1.set_ylabel('spike counts')
+            ax1.legend()
+            ax1.set_title('rho = %.2f' %rho)
+            ax1.locator_params(nbins=4)
+            plt.setp(ax1.get_xticklabels(), visible=False)
+            ax1.set_yticklabels([])
+
+            ax2 = plt.subplot(gs2[1, :], sharex=ax1)
+            ax2.plot(t, r_all[start:end], label='rate $\lambda$')
+            ax2.legend()
+            ax2.set_xlabel('time [s]')
+            ax2.set_ylabel('firing rate')
+            ax2.set_xlim([start / freq, end / freq])
+            ax2.set_yticklabels([])
+
+            ax2.locator_params(nbins=4)
+
+            return  fig
+
 
 
 
