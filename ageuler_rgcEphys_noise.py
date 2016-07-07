@@ -2056,6 +2056,7 @@ class StcInstPca(dj.Computed):
             plt.plot(ev, 'o')
             plt.xlabel('# Eigenvector')
             plt.ylabel('Variance')
+            plt.xlim([-1,len(ev)+1])
 
             fig.tight_layout()
             fig.subplots_adjust(top=.88)
@@ -2489,6 +2490,122 @@ class StaInstArd(dj.Computed):
                          fontsize=16)
 
             return fig
+
+@schema
+class PredStaInst(dj.Computed):
+    definition="""
+    -> StaInst
+    -> StimInst
+    ---
+    r       :longblob                           # predicted rate
+    k       :double                             # split for cross-validation
+    rho     :double                             # mean correlation coefficient
+    res     :double                             # mean ordinaray test error
+    nl_type :enum('exp','sm','thr','none')      # type of rectifying non-linearity used, selected as best fitting from those three
+    """
+
+    def _make_tuples(self,key):
+
+        ntrigger = (Trigger() & key).fetch1['ntrigger']
+
+        # fetch spike counts
+        y = (StaInst() & key).fetch1['y']
+
+        # fetch stimulus
+
+        s_inst = (StimInst() & key).fetch1['s_inst']
+        s = s_inst[:, 0:ntrigger]
+
+        # fetch best fitting non-linearity:
+        res_exp = (NonlinInstExp() & key).fetch1['res']
+        res_sm = (NonlinInstSoftmax() & key).fetch1['res']
+        res_thr = (NonlinInstThreshold() & key).fetch1['res']
+
+        res = np.array([res_exp, res_sm, res_thr])
+
+        id_nl = res.argmin()
+
+        if id_nl == 0:
+            aopt, bopt, copt = (NonlinInstExp & key).fetch1['aopt', 'bopt', 'copt']
+
+            def non_lin(x):
+                return aopt * np.exp(bopt * x) + copt
+
+            nl_type = 'exp'
+
+        elif id_nl == 1:
+            aopt, topt = (NonlinInstSoftmax & key).fetch1['aopt', 'topt']
+
+            def non_lin(x):
+                ex = np.exp(x - aopt) /topt
+                sm = ex / ex.sum()
+
+            nl_type = 'sm'
+
+        elif id_nl == 2:
+            aopt, topt = (NonlinInstThreshold & key).fetch1['aopt', 'thropt']
+
+            def non_lin(x):
+                return np.piecewise(x, [x < topt, x >= topt], [0, lambda x: aopt * x])
+
+            nl_type = 'thr'
+        else:
+            print('Optimal non-linearity not found! Using linear prediction')
+
+            def non_lin(x):
+                return x
+
+        k_fold = 10
+
+        kf = KFold(ntrigger, n_folds=k_fold, shuffle=False)
+
+        LNG_dict = {}
+        LNG_dict.clear()
+        LNG_dict['w'] = []
+        LNG_dict['r'] = []
+        LNG_dict['y_test'] = []
+        LNG_dict['pearson_r'] = []
+        LNG_dict['err'] = []
+
+        for train, test in kf:
+            I = np.dot(s[:, train], s[:, train].T)
+            a = np.dot(s[:, train], y[train])
+
+            w = np.linalg.solve(I, a)
+
+            LNG_dict['w'].append(w)
+
+            LNG_dict['y_test'].append(y[test])
+
+            r0 = np.dot(w, s[:, test])
+            r = non_lin(r0)
+
+            LNG_dict['r'].append(r)
+
+            err = np.square(y[test] / ntrigger - r).sum() / len((test))
+
+            LNG_dict['err'].append(err)
+
+            LNG_dict['pearson_r'].append(np.corrcoef(r, y[test])[0, 1])
+
+        LNG_df = pd.DataFrame(LNG_dict)
+
+        r_all = np.array([])
+
+        for ix, row in LNG_df.iterrows():
+            r_all = np.hstack((r_all, row.r))
+
+        print(key)
+        display(LNG_df)
+
+        self.insert1(dict(key,
+                            r = r_all,
+                            k = k_fold,
+                            rho = np.nanmean(LNG_df.pearson_r,0),
+                            res = np.nanmean(LNG_df.err,0),
+                            nl_type = nl_type
+        ))
+
 
 
 
