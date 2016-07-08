@@ -3314,7 +3314,7 @@ class PredStaInst(dj.Computed):
 
             def non_lin(x):
                 ex = np.exp(x - aopt) /topt
-                sm = ex / ex.sum()
+                return ex / ex.sum()
 
             nl_type = 'sm'
 
@@ -3511,7 +3511,7 @@ class PredStaInstRidge(dj.Computed):
 
             def non_lin(x):
                 ex = np.exp(x - aopt) / topt
-                sm = ex / ex.sum()
+                return ex / ex.sum()
 
             nl_type = 'sm'
 
@@ -3725,13 +3725,13 @@ class PredStaInstArd(dj.Computed):
 
         elif id_nl == 1:
             print('Using softmax non-linearity')
+            nl_type = 'sm'
             aopt, topt = (NonlinInstSoftmaxArd() & key).fetch1['aopt', 'topt']
 
             def non_lin(x):
                 ex = np.exp(x - aopt) / topt
-                sm = ex / ex.sum()
+                return ex / ex.sum()
 
-            nl_type = 'sm'
 
         elif id_nl == 2:
             print('Using threshold non-linearity')
