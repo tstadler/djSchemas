@@ -3331,6 +3331,8 @@ class PredStaInst(dj.Computed):
             def non_lin(x):
                 return x
 
+            nl_type ='none'
+
         k_fold = 10
 
         kf = KFold(ntrigger, n_folds=k_fold, shuffle=False)
@@ -3406,8 +3408,8 @@ class PredStaInst(dj.Computed):
             ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
 
             w,y = (StaInst() & key).fetch1['sta_inst','y']
-            r_all = (PredStaInst() & key).fetch1['r']
-            rho,k_fold = (PredStaInst() & key).fetch1['rho','k']
+            r_all = (self & key).fetch1['r']
+            rho,k_fold = (self & key).fetch1['rho','k']
 
             start = 200
             end = 400
@@ -3455,6 +3457,433 @@ class PredStaInst(dj.Computed):
                          fontsize=16)
 
             return fig
+
+
+@schema
+class PredStaInstRidge(dj.Computed):
+    definition="""
+    -> StaInstRidge
+    -> StimInst
+    ---
+    r       :longblob                           # predicted rate
+    k       :double                             # split for cross-validation
+    rho     :double                             # mean correlation coefficient
+    res     :double                             # mean ordinaray test error
+    nl_type :enum('exp','sm','thr','none')      # type of rectifying non-linearity used, selected as best fitting from those three
+    """
+
+    def _make_tuples(self,key):
+
+        ntrigger = (Trigger() & key).fetch1['ntrigger']
+
+        # fetch spike counts
+        y = (StaInst() & key).fetch1['y']
+
+
+        # fetch stimulus
+
+        s_inst = (StimInst() & key).fetch1['s_inst']
+        s = s_inst[:, 0:ntrigger]
+
+        # fetch optimal hyperparams
+
+        theta_ridge, sigma_ridge = (StaInstRidge() & key).fetch1['theta_ridge', 'sigma_ridge']
+
+        # fetch best fitting non-linearity:
+        res_exp = (NonlinInstExpRidge() & key).fetch1['res']
+        res_sm = (NonlinInstSoftmaxRidge() & key).fetch1['res']
+        res_thr = (NonlinInstThresholdRidge() & key).fetch1['res']
+
+        res = np.array([res_exp, res_sm, res_thr])
+
+        id_nl = res.argmin()
+
+        if id_nl == 0:
+            aopt, bopt, copt = (NonlinInstExpRidge() & key).fetch1['aopt', 'bopt', 'copt']
+
+            def non_lin(x):
+                return aopt * np.exp(bopt * x) + copt
+
+            nl_type = 'exp'
+
+        elif id_nl == 1:
+            aopt, topt = (NonlinInstSoftmaxRidge() & key).fetch1['aopt', 'topt']
+
+            def non_lin(x):
+                ex = np.exp(x - aopt) / topt
+                sm = ex / ex.sum()
+
+            nl_type = 'sm'
+
+        elif id_nl == 2:
+            aopt, topt = (NonlinInstThresholdRidge() & key).fetch1['aopt', 'thropt']
+
+            def non_lin(x):
+                return np.piecewise(x, [x < topt, x >= topt], [0, lambda x: aopt * x])
+
+            nl_type = 'thr'
+        else:
+            print('Optimal non-linearity not found! Using linear prediction')
+
+            def non_lin(x):
+                return x
+
+            nl_type = 'none'
+
+        k_fold = 10
+
+        kf = KFold(ntrigger, n_folds=k_fold, shuffle=False)
+
+        LNG_dict = {}
+        LNG_dict.clear()
+        LNG_dict['w'] = []
+        LNG_dict['r'] = []
+        LNG_dict['y_test'] = []
+        LNG_dict['pearson_r'] = []
+        LNG_dict['err'] = []
+
+        for train, test in kf:
+            # Fit filter
+
+            c_prior_ridge, c_post_ridge, m_post_ridge = self.params_ridge(theta_ridge, sigma_ridge, s[:, train], y[train])
+
+            LNG_dict['w'].append(m_post_ridge)
+
+            LNG_dict['y_test'].append(y[test])
+
+            r0 = np.dot(m_post_ridge, s[:, test])
+            r = non_lin(r0)
+
+            LNG_dict['r'].append(r)
+
+            err = np.square(y[test] / ntrigger - r).sum() / len((test))
+
+            LNG_dict['err'].append(err)
+
+            LNG_dict['pearson_r'].append(np.corrcoef(r, y[test])[0, 1])
+
+        LNG_df = pd.DataFrame(LNG_dict)
+
+        r_all = np.array([])
+
+        for ix, row in LNG_df.iterrows():
+            r_all = np.hstack((r_all, row.r))
+
+        self.insert1(dict(key,
+                          r=r_all,
+                          k=k_fold,
+                          rho=np.nanmean(LNG_df.pearson_r, 0),
+                          res=np.nanmean(LNG_df.err, 0),
+                          nl_type=nl_type
+                          ))
+
+    def params_ridge(self,theta, sigma, s, y):
+
+        """
+        Calculate the diagnoal prior and posterior covariance matrix as well as the MAP estimate in a linear gaussian encoding model with ridge regularization
+
+        :param theta: scalar rdige reg hyperparameter
+        :param sigma: scalar encoding noise var
+        :param s: array instantaneous stimulus as (ns x T)
+        :param y: array spike counts vector as array (T x 1)
+        :return: c_prior,c_post, m_post
+        """
+
+        ns = s.shape[0]
+        T = s.shape[1]
+
+        c_prior = np.eye(ns, ns) / theta
+
+        c_post = np.linalg.inv((np.dot(s, s.T) / sigma + theta * np.eye(ns, ns)))
+
+        m_post = np.dot(c_post, np.dot(s, y)) / sigma
+
+        return c_prior, c_post, m_post
+
+    def plt_pred(self, ):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            freq = (StimMeta() & key).fetch1['freq']
+            ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
+
+            y = (StaInst() & key).fetch1['y']
+            w = (StaInstRidge() & key).fetch1['sta_inst_ridge']
+            r_all = (self & key).fetch1['r']
+            rho, k_fold = (self & key).fetch1['rho', 'k']
+
+            start = 200
+            end = 400
+            t = np.linspace(start / freq, end / freq, end - start)
+
+            fig = plt.figure()
+            gs1 = gridsp.GridSpec(2, 1)
+            gs1.update(left=.05, right=.5)
+            ax0 = plt.subplot(gs1[:, :])
+            im = ax0.imshow(w.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm_r, interpolation='nearest')
+            cbar = plt.colorbar(im, ax=ax0, shrink=.88)
+            ax0.set_xticklabels([])
+            ax0.set_yticklabels([])
+            ax0.set_title('Instantaneous STA')
+            # cbar.set_label('stim intensity', labelpad=20, rotation=270)
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            gs2 = gridsp.GridSpec(2, 1)
+            gs2.update(left=.55, right=.95)
+            ax1 = plt.subplot(gs2[0, :])
+            # ax1.plot(t,y[start:end],label='prediction')
+            ax1.plot(t, y[start:end], label='data')
+            ax1.set_xlim([start / freq, end / freq])
+            ax1.set_ylabel('spike counts')
+            ax1.legend()
+            ax1.set_title('$\\rho$ = %.2f' % rho)
+            ax1.locator_params(nbins=4)
+            plt.setp(ax1.get_xticklabels(), visible=False)
+            ax1.set_yticklabels([])
+
+            ax2 = plt.subplot(gs2[1, :], sharex=ax1)
+            ax2.plot(t, r_all[start:end], label='rate $\lambda$')
+            ax2.legend()
+            ax2.set_xlabel('time [s]')
+            ax2.set_ylabel('firing rate')
+            ax2.set_xlim([start / freq, end / freq])
+            ax2.set_yticklabels([])
+
+            ax2.locator_params(nbins=4)
+
+            plt.suptitle('Instantaneous STA with Ridge Regression prior and  %.0f -fold cross-validation\n' % k_fold + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+
+@schema
+class PredStaInstArd(dj.Computed):
+    definition="""
+    -> StaInstArd
+    -> StimInst
+    ---
+    r       :longblob                           # predicted rate
+    k       :double                             # split for cross-validation
+    rho     :double                             # mean correlation coefficient
+    res     :double                             # mean ordinaray test error
+    nl_type :enum('exp','sm','thr','none')      # type of rectifying non-linearity used, selected as best fitting from those three
+    """
+
+    def _make_tuples(self,key):
+
+        ntrigger = (Trigger() & key).fetch1['ntrigger']
+
+        # fetch spike counts
+        y = (StaInst() & key).fetch1['y']
+
+
+        # fetch stimulus
+
+        s_inst = (StimInst() & key).fetch1['s_inst']
+        s = s_inst[:, 0:ntrigger]
+
+        # fetch optimal hyperparams
+
+        theta_ard, sigma_ard = (StaInstArd() & key).fetch1['theta_ard', 'sigma_ard']
+
+        # fetch best fitting non-linearity:
+        res_exp = (NonlinInstExpArd() & key).fetch1['res']
+        res_sm = (NonlinInstSoftmaxArd() & key).fetch1['res']
+        res_thr = (NonlinInstThresholdArd() & key).fetch1['res']
+
+        res = np.array([res_exp, res_sm, res_thr])
+
+        id_nl = res.argmin()
+
+        if id_nl == 0:
+            aopt, bopt, copt = (NonlinInstExpArd() & key).fetch1['aopt', 'bopt', 'copt']
+
+            def non_lin(x):
+                return aopt * np.exp(bopt * x) + copt
+
+            nl_type = 'exp'
+
+        elif id_nl == 1:
+            aopt, topt = (NonlinInstSoftmaxArd() & key).fetch1['aopt', 'topt']
+
+            def non_lin(x):
+                ex = np.exp(x - aopt) / topt
+                sm = ex / ex.sum()
+
+            nl_type = 'sm'
+
+        elif id_nl == 2:
+            aopt, topt = (NonlinInstThresholdArd() & key).fetch1['aopt', 'thropt']
+
+            def non_lin(x):
+                return np.piecewise(x, [x < topt, x >= topt], [0, lambda x: aopt * x])
+
+            nl_type = 'thr'
+        else:
+            print('Optimal non-linearity not found! Using linear prediction')
+
+            def non_lin(x):
+                return x
+
+            nl_type = 'none'
+
+        k_fold = 10
+
+        kf = KFold(ntrigger, n_folds=k_fold, shuffle=False)
+
+        LNG_dict = {}
+        LNG_dict.clear()
+        LNG_dict['w'] = []
+        LNG_dict['r'] = []
+        LNG_dict['y_test'] = []
+        LNG_dict['pearson_r'] = []
+        LNG_dict['err'] = []
+
+        for train, test in kf:
+            # Fit filter
+
+            c_prior_ard, c_post_ard, m_post_ard = self.params_ard(theta_ard, sigma_ard, s[:, train], y[train])
+
+            LNG_dict['w'].append(m_post_ard)
+
+            LNG_dict['y_test'].append(y[test])
+
+            r0 = np.dot(m_post_ard, s[:, test])
+            r = non_lin(r0)
+
+            LNG_dict['r'].append(r)
+
+            err = np.square(y[test] / ntrigger - r).sum() / len((test))
+
+            LNG_dict['err'].append(err)
+
+            LNG_dict['pearson_r'].append(np.corrcoef(r, y[test])[0, 1])
+
+        LNG_df = pd.DataFrame(LNG_dict)
+
+        r_all = np.array([])
+
+        for ix, row in LNG_df.iterrows():
+            r_all = np.hstack((r_all, row.r))
+
+        self.insert1(dict(key,
+                          r=r_all,
+                          k=k_fold,
+                          rho=np.nanmean(LNG_df.pearson_r, 0),
+                          res=np.nanmean(LNG_df.err, 0),
+                          nl_type=nl_type
+                          ))
+
+    def params_ard(self,theta, sigma, s, y):
+
+        ns = s.shape[0]
+        T = s.shape[1]
+
+        c_prior = np.diag(1 / theta)
+
+        c_post = np.linalg.inv((np.dot(s, s.T) / sigma + np.diag(theta) * np.eye(ns, ns)))
+
+        m_post = np.dot(c_post, np.dot(s, y)) / sigma
+
+        return c_prior, c_post, m_post
+
+    def plt_pred(self, ):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            freq = (StimMeta() & key).fetch1['freq']
+            ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
+
+            y = (StaInst() & key).fetch1['y']
+            w = (StaInstArd() & key).fetch1['sta_inst_ard']
+            r_all = (self & key).fetch1['r']
+            rho, k_fold = (self & key).fetch1['rho', 'k']
+
+            start = 200
+            end = 400
+            t = np.linspace(start / freq, end / freq, end - start)
+
+            fig = plt.figure()
+            gs1 = gridsp.GridSpec(2, 1)
+            gs1.update(left=.05, right=.5)
+            ax0 = plt.subplot(gs1[:, :])
+            im = ax0.imshow(w.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm_r, interpolation='nearest')
+            cbar = plt.colorbar(im, ax=ax0, shrink=.88)
+            ax0.set_xticklabels([])
+            ax0.set_yticklabels([])
+            ax0.set_title('Instantaneous STA')
+            # cbar.set_label('stim intensity', labelpad=20, rotation=270)
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            gs2 = gridsp.GridSpec(2, 1)
+            gs2.update(left=.55, right=.95)
+            ax1 = plt.subplot(gs2[0, :])
+            # ax1.plot(t,y[start:end],label='prediction')
+            ax1.plot(t, y[start:end], label='data')
+            ax1.set_xlim([start / freq, end / freq])
+            ax1.set_ylabel('spike counts')
+            ax1.legend()
+            ax1.set_title('$\\rho$ = %.2f' % rho)
+            ax1.locator_params(nbins=4)
+            plt.setp(ax1.get_xticklabels(), visible=False)
+            ax1.set_yticklabels([])
+
+            ax2 = plt.subplot(gs2[1, :], sharex=ax1)
+            ax2.plot(t, r_all[start:end], label='rate $\lambda$')
+            ax2.legend()
+            ax2.set_xlabel('time [s]')
+            ax2.set_ylabel('firing rate')
+            ax2.set_xlim([start / freq, end / freq])
+            ax2.set_yticklabels([])
+
+            ax2.locator_params(nbins=4)
+
+            plt.suptitle('Instantaneous STA with ARD prior and  %.0f -fold cross-validation\n' % k_fold + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+
+
+
+
 
 
 
