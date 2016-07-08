@@ -3685,7 +3685,7 @@ class PredStaInstArd(dj.Computed):
     k       :double                             # split for cross-validation
     rho     :double                             # mean correlation coefficient
     res     :double                             # mean ordinaray test error
-    nl_type :enum('exp','sm','thr','none')      # type of rectifying non-linearity used, selected as best fitting from those three
+    nl_type :enum("exp","sm","thr","none")      # type of rectifying non-linearity used, selected as best fitting from those three
     """
 
     def _make_tuples(self,key):
@@ -3798,7 +3798,7 @@ class PredStaInstArd(dj.Computed):
                           k=k_fold,
                           rho=np.nanmean(LNG_df.pearson_r, 0),
                           res=np.nanmean(LNG_df.err, 0),
-                          nl_type=nl_type
+                          nl_type= nl_type
                           ))
 
     def params_ard(self,theta, sigma, s, y):
