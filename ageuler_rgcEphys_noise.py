@@ -3423,7 +3423,7 @@ class PredStaInst(dj.Computed):
             cbar = plt.colorbar(im, ax=ax0, shrink=.88)
             ax0.set_xticklabels([])
             ax0.set_yticklabels([])
-            ax0.set_title('Instantaneous STA')
+            ax0.set_title('Filter')
             # cbar.set_label('stim intensity', labelpad=20, rotation=270)
             tick_locator = ticker.MaxNLocator(nbins=5)
             cbar.locator = tick_locator
@@ -3452,7 +3452,7 @@ class PredStaInst(dj.Computed):
 
             ax2.locator_params(nbins=4)
 
-            plt.suptitle('Instantaneous STA with k-fold = %.0f cross-validation\n'%k_fold + str(
+            plt.suptitle('Instantaneous STA with  %.0f - fold cross-validation\n'%k_fold + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
@@ -3639,7 +3639,7 @@ class PredStaInstRidge(dj.Computed):
             cbar = plt.colorbar(im, ax=ax0, shrink=.88)
             ax0.set_xticklabels([])
             ax0.set_yticklabels([])
-            ax0.set_title('Instantaneous STA')
+            ax0.set_title('Filter')
             # cbar.set_label('stim intensity', labelpad=20, rotation=270)
             tick_locator = ticker.MaxNLocator(nbins=5)
             cbar.locator = tick_locator
@@ -3668,7 +3668,7 @@ class PredStaInstRidge(dj.Computed):
 
             ax2.locator_params(nbins=4)
 
-            plt.suptitle('Instantaneous STA with Ridge Regression prior and  %.0f -fold cross-validation\n' % k_fold + str(
+            plt.suptitle('Instantaneous STA with Ridge Regression prior and  %.0f - fold cross-validation\n' % k_fold + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
@@ -3853,7 +3853,7 @@ class PredStaInstArd(dj.Computed):
             cbar = plt.colorbar(im, ax=ax0, shrink=.88)
             ax0.set_xticklabels([])
             ax0.set_yticklabels([])
-            ax0.set_title('Instantaneous STA')
+            ax0.set_title('Filter')
             # cbar.set_label('stim intensity', labelpad=20, rotation=270)
             tick_locator = ticker.MaxNLocator(nbins=5)
             cbar.locator = tick_locator
@@ -3882,7 +3882,7 @@ class PredStaInstArd(dj.Computed):
 
             ax2.locator_params(nbins=4)
 
-            plt.suptitle('Instantaneous STA with ARD prior and  %.0f -fold cross-validation\n' % k_fold + str(
+            plt.suptitle('Instantaneous STA with ARD prior and  %.0f - fold cross-validation\n' % k_fold + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
