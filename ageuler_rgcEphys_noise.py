@@ -3715,6 +3715,7 @@ class PredStaInstArd(dj.Computed):
         id_nl = res.argmin()
 
         if id_nl == 0:
+            print('Using exponential non-linearity')
             aopt, bopt, copt = (NonlinInstExpArd() & key).fetch1['aopt', 'bopt', 'copt']
 
             def non_lin(x):
@@ -3723,6 +3724,7 @@ class PredStaInstArd(dj.Computed):
             nl_type = 'exp'
 
         elif id_nl == 1:
+            print('Using softmax non-linearity')
             aopt, topt = (NonlinInstSoftmaxArd() & key).fetch1['aopt', 'topt']
 
             def non_lin(x):
@@ -3732,6 +3734,7 @@ class PredStaInstArd(dj.Computed):
             nl_type = 'sm'
 
         elif id_nl == 2:
+            print('Using threshold non-linearity')
             aopt, topt = (NonlinInstThresholdArd() & key).fetch1['aopt', 'thropt']
 
             def non_lin(x):
