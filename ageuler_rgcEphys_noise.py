@@ -3772,7 +3772,7 @@ class PredStaInstArd(dj.Computed):
 
             LNG_dict['r'].append(r)
 
-            err = np.square(y[test] / ntrigger - r).sum() / len((test))
+            err = np.square(y[test] / ntrigger - np.nan_to_num(r)).sum() / len((test))
 
             LNG_dict['err'].append(err)
 
