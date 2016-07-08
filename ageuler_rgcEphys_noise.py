@@ -3772,7 +3772,12 @@ class PredStaInstArd(dj.Computed):
 
             LNG_dict['r'].append(r)
 
-            err = np.square(y[test] / ntrigger - np.nan_to_num(r)).sum() / len((test))
+            try:
+                err = np.square(y[test] / ntrigger - np.nan_to_num(r)).sum() / len((test))
+            except Exception as e0:
+                print('Firing rate is None\n', e0)
+                r = np.zeros(len(test))
+                err = np.square(y[test] / ntrigger - np.nan_to_num(r)).sum() / len((test))
 
             LNG_dict['err'].append(err)
 
