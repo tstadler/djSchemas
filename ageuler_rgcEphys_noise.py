@@ -3409,7 +3409,7 @@ class PredStaInst(dj.Computed):
 
             w,y = (StaInst() & key).fetch1['sta_inst','y']
             r_all = (self & key).fetch1['r']
-            rho,k_fold = (self & key).fetch1['rho','k']
+            rho,k_fold,nl_type = (self & key).fetch1['rho','k','nl_type']
 
             start = 200
             end = 400
@@ -3452,7 +3452,7 @@ class PredStaInst(dj.Computed):
 
             ax2.locator_params(nbins=4)
 
-            plt.suptitle('Instantaneous STA with  %.0f - fold cross-validation\n'%k_fold + str(
+            plt.suptitle('Instantaneous STA with  %.0f - fold cross-validation\n'%k_fold  + 'Non-Linearity: '+ nl_type + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
@@ -3625,7 +3625,7 @@ class PredStaInstRidge(dj.Computed):
             y = (StaInst() & key).fetch1['y']
             w = (StaInstRidge() & key).fetch1['sta_inst_ridge']
             r_all = (self & key).fetch1['r']
-            rho, k_fold = (self & key).fetch1['rho', 'k']
+            rho, k_fold,nl_type = (self & key).fetch1['rho', 'k','nl_type']
 
             start = 200
             end = 400
@@ -3668,7 +3668,7 @@ class PredStaInstRidge(dj.Computed):
 
             ax2.locator_params(nbins=4)
 
-            plt.suptitle('Instantaneous STA with Ridge Regression prior and  %.0f - fold cross-validation\n' % k_fold + str(
+            plt.suptitle('Instantaneous STA with Ridge Regression prior and  %.0f - fold cross-validation\n'%k_fold + 'Non-Linearity: '+ nl_type + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
@@ -3839,7 +3839,7 @@ class PredStaInstArd(dj.Computed):
             y = (StaInst() & key).fetch1['y']
             w = (StaInstArd() & key).fetch1['sta_inst_ard']
             r_all = (self & key).fetch1['r']
-            rho, k_fold = (self & key).fetch1['rho', 'k']
+            rho, k_fold,nl_type = (self & key).fetch1['rho', 'k','nl_type']
 
             start = 200
             end = 400
@@ -3882,7 +3882,7 @@ class PredStaInstArd(dj.Computed):
 
             ax2.locator_params(nbins=4)
 
-            plt.suptitle('Instantaneous STA with ARD prior and  %.0f - fold cross-validation\n' % k_fold + str(
+            plt.suptitle('Instantaneous STA with ARD prior and  %.0f - fold cross-validation\n' % k_fold  + 'Non-Linearity: '+ nl_type + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
