@@ -185,9 +185,6 @@ class Morph(dj.Computed):
 
             plt.suptitle('Linestack\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
 
-            fig.tight_layout()
-            fig.subplots_adjust(top=.8)
-
             return fig
 
 
