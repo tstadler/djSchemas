@@ -5245,7 +5245,8 @@ class LnpExp(dj.Computed):
 
     def _make_tuples(self,key):
 
-        s = (StimInst() & key).fetch1['s_inst']
+        ntrigger = (Trigger() & key).fetch1['ntrigger']
+        s = (StimInst() & key).fetch1['s_inst'][:,0:ntrigger]
         y = (StaInst() & key).fetch1['y']
 
         ns,T = s.shape
