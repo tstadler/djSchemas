@@ -4791,11 +4791,12 @@ class PredStaInstBlur(dj.Computed):
             ax2.set_xlabel('time [s]')
             ax2.set_ylabel('firing rate')
             ax2.set_xlim([start / freq, end / freq])
+            ax2.set_ylim([0,r_all.max()])
             ax2.set_yticklabels([])
 
             ax2.locator_params(nbins=4)
 
-            plt.suptitle('Blurred DF with  $\sigma$ = %.0f \n'%sigma  + 'Non-Linearity: '+ nl_type + str(
+            plt.suptitle('Blurred DF with  $\sigma$ = %.0f and Non-Linearity: '%sigma  + '' + nl_type + '\n' + str(
                 exp_date) + ': ' + eye + ': ' + fname,
                          fontsize=16)
 
