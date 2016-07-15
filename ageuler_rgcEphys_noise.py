@@ -144,7 +144,7 @@ class Morph(dj.Computed):
 
         for key in self.project().fetch.as_dict:
 
-            stack = (self & key).fetch1['stack']
+            stack = (self & key).fetch1['stack'][::-1]
             df_size_x, df_size_y = (self & key).fetch1['df_size_x', 'df_size_y']
 
             exp_date = (Experiment() & key).fetch1['exp_date']
