@@ -4791,7 +4791,7 @@ class PredStaInstBlur(dj.Computed):
             ax2.set_xlabel('time [s]')
             ax2.set_ylabel('firing rate')
             ax2.set_xlim([start / freq, end / freq])
-            ax2.set_ylim([0,r_all.max()])
+            ax2.set_ylim([0,r_all[start:end].max()])
             ax2.set_yticklabels([])
 
             ax2.locator_params(nbins=4)
@@ -5230,6 +5230,69 @@ class PredStaInstArd(dj.Computed):
                          fontsize=16)
 
             return fig
+
+@schema
+class LnpExp(dj.Computed):
+    definition="""
+    -> StimInst
+    ---
+    rf  :longblob   # mle of the rf under an LNP with exponential non-linearity
+    b   :double     # non-linear bias term
+    nll : double    # negative log-likelihood achieved
+    """
+
+
+
+    def _make_tuples(self,key):
+
+        s = (StimInst() & key).fetch1['s_inst']
+        y = (StaInst() & key).fetch1['w']
+
+        ns,T = s.shape
+
+        pars0 = np.hstack((np.zeros(ns), 0))
+
+        res = scoptimize.minimize(self.ll_exp, pars0, args=(s, y, -1), jac=True)
+
+        nll = res.fun[0]
+        w_opt = res.x[0:ns]
+        b_opt = res.x[ns]
+
+        self.insert1(dict(key,
+                          rf = w_opt,
+                          b = b_opt,
+                          nll = nll))
+
+
+
+
+    def ll_exp(self,params, s, y, sign=-1):
+        """
+            Compute the log-likelihood of an LNP model wih exponential non-linearity
+            :arg params:
+                :arg wT: current receptive field array(ns,)
+                :arg b: scalar current offset estimate
+            :arg s: stimulus array(ns,T)
+            :arg y: spiketimes array(T,1)
+
+            :return sign*ll: computed log-likelihood scalar
+            :return sign*dll: computed first derivative of the ll
+        """
+        ns, T = s.shape
+
+        wT = params[0:ns]
+        b = params[ns]
+
+        r = np.exp(wT.dot(s) + b)
+        ll = sign * (np.log(r).dot(y) - r.dot(np.ones(T)))
+
+        dll_w = sign * (s.dot(y) - s.dot(r))
+        dll_b = sign * ((y - r).dot(np.ones(T)))
+
+        dll = np.hstack((dll_w, dll_b))
+
+        return ll, dll
+
 
 
 
