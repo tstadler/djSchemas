@@ -5247,11 +5247,11 @@ class LnpExp(dj.Computed):
 
         ntrigger = (Trigger() & key).fetch1['ntrigger']
         s = (StimInst() & key).fetch1['s_inst'][:,0:ntrigger]
-        y = (StaInst() & key).fetch1['y']
+        w_sta,y = (StaInst() & key).fetch1['sta_inst','y']
 
         ns,T = s.shape
 
-        pars0 = np.hstack((np.zeros(ns), 0))
+        pars0 = np.hstack((w_sta, 0))
 
         res = scoptimize.minimize(self.ll_exp, pars0, args=(s, y, -1), jac=True)
 
@@ -5263,9 +5263,6 @@ class LnpExp(dj.Computed):
                           rf = w_opt,
                           b = b_opt,
                           nll = nll))
-
-
-
 
     def ll_exp(self,params, s, y, sign=-1):
         """
@@ -5284,11 +5281,11 @@ class LnpExp(dj.Computed):
         wT = params[0:ns]
         b = params[ns]
 
-        r = np.exp(wT.dot(s) + b)
-        ll = sign * (np.log(r).dot(y) - r.dot(np.ones(T)))
+        r = np.exp(np.dot(wT, s) + b)
+        ll = sign * (np.dot(np.dot(wT, s) + b, y) - np.dot(r, np.ones(T)))
 
-        dll_w = sign * (s.dot(y) - s.dot(r))
-        dll_b = sign * ((y - r).dot(np.ones(T)))
+        dll_w = sign * (np.dot(s, y) - np.dot(s, r))
+        dll_b = sign * (np.dot((y - r), np.ones(T)))
 
         dll = np.hstack((dll_w, dll_b))
 
@@ -5374,7 +5371,7 @@ class PredLnpExp(dj.Computed):
         ntrigger = (Trigger() & key).fetch1['ntrigger']
 
         # fetch spike counts
-        y = (StaInst() & key).fetch1['y']
+        w_sta,y = (StaInst() & key).fetch1['sta_inst','y']
 
 
         # fetch stimulus
@@ -5386,7 +5383,7 @@ class PredLnpExp(dj.Computed):
 
         kf = KFold(ntrigger, n_folds=k_fold, shuffle=False)
 
-        pars0 = np.hstack((np.zeros(ns), 0))
+        pars0 = np.hstack((w_sta, 0))
 
         ## Cross-validate
         LNP_dict = {}
@@ -5404,10 +5401,9 @@ class PredLnpExp(dj.Computed):
 
 
             res = scoptimize.minimize(self.ll_exp, pars0, args=(s[:, train], y[train]), jac=True)
-            params_opt = res.x
-            nll_train = res.fun
 
             params_opt = res.x
+            nll_train = res.fun
             w_opt = res.x[0:ns]
             b_opt = res.x[ns]
 
@@ -5442,7 +5438,8 @@ class PredLnpExp(dj.Computed):
                           nll = np.nanmean(LNP_df.nll_test,0)
                           ))
 
-    def ll_exp(self, params, s, y, sign=-1):
+    def ll_exp(self,params, s, y, sign=-1):
+
         """
             Compute the log-likelihood of an LNP model wih exponential non-linearity
             :arg params:
@@ -5459,11 +5456,11 @@ class PredLnpExp(dj.Computed):
         wT = params[0:ns]
         b = params[ns]
 
-        r = np.exp(wT.dot(s) + b)
-        ll = sign * (np.log(r).dot(y) - r.dot(np.ones(T)))
+        r = np.exp(np.dot(wT, s) + b)
+        ll = sign * (np.dot(np.dot(wT, s) + b, y) - np.dot(r, np.ones(T)))
 
-        dll_w = sign * (s.dot(y) - s.dot(r))
-        dll_b = sign * ((y - r).dot(np.ones(T)))
+        dll_w = sign * (np.dot(s, y) - np.dot(s, r))
+        dll_b = sign * (np.dot((y - r), np.ones(T)))
 
         dll = np.hstack((dll_w, dll_b))
 
