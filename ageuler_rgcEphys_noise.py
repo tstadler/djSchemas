@@ -5356,6 +5356,196 @@ class LnpExp(dj.Computed):
             return fig
 
 
+@schema
+class PredLnpExp(dj.Computed):
+    definition="""
+    -> LnpExp
+    -> StimInst
+    ---
+    r       :longblob                           # predicted rate
+    k       :double                             # split for cross-validation
+    rho     :double                             # mean correlation coefficient
+    res     :double                             # mean ordinaray test error
+    nll     :double                             # mean test neg log-likelihood
+    """
+
+    def _make_tuples(self,key):
+
+        ntrigger = (Trigger() & key).fetch1['ntrigger']
+
+        # fetch spike counts
+        y = (StaInst() & key).fetch1['y']
+
+
+        # fetch stimulus
+
+        s_inst = (StimInst() & key).fetch1['s_inst']
+        s = s_inst[:, 0:ntrigger]
+        ns,T = s.shape
+        k_fold = 10
+
+        kf = KFold(ntrigger, n_folds=k_fold, shuffle=False)
+
+        pars0 = np.hstack((np.zeros(ns), 0))
+
+        ## Cross-validate
+        LNP_dict = {}
+        LNP_dict.clear()
+        LNP_dict['nll_train'] = []
+        LNP_dict['nll_test'] = []
+        LNP_dict['w'] = []
+        LNP_dict['b'] = []
+        LNP_dict['res'] = []
+        LNP_dict['pearson_r'] = []
+        LNP_dict['r'] = []
+        LNP_dict['y_test'] = []
+
+        for train, test in kf:
+
+
+            res = scoptimize.minimize(self.ll_exp, pars0, args=(s[:, train], y[train]), jac=True)
+            params_opt = res.x
+            nll_train = res.fun
+
+            params_opt = res.x
+            w_opt = res.x[0:ns]
+            b_opt = res.x[ns]
+
+            LNP_dict['nll_train'].append(nll_train)
+            LNP_dict['nll_test'].append(self.ll_exp(params_opt, s[:, test], y[test])[0])
+            LNP_dict['w'].append(w_opt)
+            LNP_dict['b'].append(b_opt)
+
+            ## Predict spike rates
+
+            r = np.exp(np.dot(w_opt,s[:, test]) + b_opt)
+
+            err = np.square(y[test] / ntrigger - r).sum() / len((test))
+            LNP_dict['res'].append(err)
+            LNP_dict['pearson_r'].append(np.corrcoef(r, y[test])[0,1])
+            LNP_dict['r'].append(r)
+            LNP_dict['y_test'].append(y[test])
+
+
+        LNP_df = pd.DataFrame(LNP_dict)
+
+        r_all = np.array([])
+
+        for ix, row in LNP_df.iterrows():
+            r_all = np.hstack((r_all, row.r))
+
+        self.insert1(dict(key,
+                          r=r_all,
+                          k=k_fold,
+                          rho=np.nanmean(LNP_df.pearson_r, 0),
+                          res=np.nanmean(LNP_df.res, 0),
+                          nll = np.nanmean(LNP_df.nll_test,0)
+                          ))
+
+    def ll_exp(self, params, s, y, sign=-1):
+        """
+            Compute the log-likelihood of an LNP model wih exponential non-linearity
+            :arg params:
+                :arg wT: current receptive field array(ns,)
+                :arg b: scalar current offset estimate
+            :arg s: stimulus array(ns,T)
+            :arg y: spiketimes array(T,1)
+
+            :return sign*ll: computed log-likelihood scalar
+            :return sign*dll: computed first derivative of the ll
+        """
+        ns, T = s.shape
+
+        wT = params[0:ns]
+        b = params[ns]
+
+        r = np.exp(wT.dot(s) + b)
+        ll = sign * (np.log(r).dot(y) - r.dot(np.ones(T)))
+
+        dll_w = sign * (s.dot(y) - s.dot(r))
+        dll_b = sign * ((y - r).dot(np.ones(T)))
+
+        dll = np.hstack((dll_w, dll_b))
+
+        return ll, dll
+
+    def plt_pred(self, ):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            freq = (StimMeta() & key).fetch1['freq']
+            ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
+
+            y = (StaInst() & key).fetch1['y']
+            w = (LnpExp() & key).fetch1['rf']
+            r_all = (self & key).fetch1['r']
+            rho, k_fold,nll = (self & key).fetch1['rho', 'k','nll']
+
+            start = 200
+            end = 400
+            t = np.linspace(start / freq, end / freq, end - start)
+
+            fig = plt.figure()
+            gs1 = gridsp.GridSpec(2, 1)
+            gs1.update(left=.05, right=.5)
+            ax0 = plt.subplot(gs1[:, :])
+            im = ax0.imshow(w.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm_r, interpolation='nearest')
+            cbar = plt.colorbar(im, ax=ax0, shrink=.88)
+            ax0.set_xticklabels([])
+            ax0.set_yticklabels([])
+            ax0.set_title('Filter')
+            # cbar.set_label('stim intensity', labelpad=20, rotation=270)
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            gs2 = gridsp.GridSpec(2, 1)
+            gs2.update(left=.55, right=.95)
+            ax1 = plt.subplot(gs2[0, :])
+            # ax1.plot(t,y[start:end],label='prediction')
+            ax1.plot(t, y[start:end], label='data')
+            ax1.set_xlim([start / freq, end / freq])
+            ax1.set_ylabel('spike counts')
+            ax1.legend()
+            ax1.set_title('$\\rho$ = %.2f' % rho)
+            ax1.locator_params(nbins=4)
+            plt.setp(ax1.get_xticklabels(), visible=False)
+            ax1.set_yticklabels([])
+
+            ax2 = plt.subplot(gs2[1, :], sharex=ax1)
+            ax2.plot(t, r_all[start:end], label='rate $\lambda$')
+            ax2.legend()
+            ax2.set_xlabel('time [s]')
+            ax2.set_ylabel('firing rate')
+            ax2.set_xlim([start / freq, end / freq])
+            ax2.set_yticklabels([])
+
+            ax2.locator_params(nbins=4)
+
+            plt.suptitle('LNP with Exp Non-Linearity and  %.0f - fold cross-validation\n' %k_fold + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+
+
+
 
 
 
