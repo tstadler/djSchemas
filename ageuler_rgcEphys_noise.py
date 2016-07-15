@@ -1825,23 +1825,24 @@ class Overlay(dj.Computed):
         scan_size = (Morph() & key).fetch1['scan_size']
         (dx_morph, dy_morph) = (Morph() & key).fetch1['dx','dy']
         (dx, dy) = (StimMeta() & key).fetch1['delx', 'dely']
+        (ns_x,ns_y) = (Stim() & key).fetch1['ns_x','ns_y']
 
         rf = (StaInst() & key).fetch1['sta_inst']
 
 
         morph = np.mean(stack, 0)
 
-        dely = (rf.shape[1] * dy - scan_size) / 2  # missing at each side of stack to fill stimulus in um
-        delx = (rf.shape[0] * dx - scan_size) / 2
+        dely = (ns_y * dy - scan_size) / 2  # missing at each side of stack to fill stimulus in um
+        delx = (ns_x * dx - scan_size) / 2
 
         ny_pad = int(dely / dy_morph)  # number of pixels needed to fill the gap
         nx_pad = int(delx / dx_morph)
 
         morph_pad = np.lib.pad(morph, ((nx_pad, nx_pad), (ny_pad, ny_pad)), 'constant', constant_values=0)
 
-        factor = (morph_pad.shape[0] / rf.shape[0], morph_pad.shape[1] / rf.shape[1])
+        factor = (morph_pad.shape[0] / ns_x, morph_pad.shape[1] / ns_y)
 
-        rf_pad = scimage.zoom(rf, factor, order=0)
+        rf_pad = scimage.zoom(rf.reshape(ns_x,ns_y), factor, order=0)
 
         params_rf = scimage.extrema(rf_pad)
         (off, on, off_ix, on_ix) = params_rf
