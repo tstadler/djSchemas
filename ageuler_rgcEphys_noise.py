@@ -2184,7 +2184,7 @@ class Blur(dj.Computed):
             ax.set_xticklabels([])
             ax.set_yticklabels([])
             cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.9)
-            cbar.set_label('normed rf', labelpad=40, rotation=270)
+            cbar.set_label('Normed RF', labelpad=40, rotation=270)
             tick_locator = ticker.MaxNLocator(nbins=5)
             cbar.locator = tick_locator
             cbar.update_ticks()
@@ -2205,7 +2205,7 @@ class Blur(dj.Computed):
             im = ax.imshow(df_minres - rf_z, cmap=plt.cm.coolwarm, clim=(-1, 1), interpolation='nearest')
             ax.set_xticks([])
             ax.set_yticks([])
-            ax.set_title('$\Sigma|rf-df_\sigma|_{min}$ : %.2f' % (minres))
+            ax.set_title('$\Sigma|RF-DF_\sigma|_{min}$ : %.2f' % (minres))
             cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.95)
             tick_locator = ticker.MaxNLocator(nbins=4)
             cbar.locator = tick_locator
@@ -2217,7 +2217,7 @@ class Blur(dj.Computed):
             ax.set_yticks([])
             ax.set_title('$\sigma$ : %.1f' % (sig_maxr))
             cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.95)
-            cbar.set_label('blurred df', labelpad=20, rotation=270, y=1.1)
+            cbar.set_label('Blurred DF', labelpad=20, rotation=270, y=1.1)
             tick_locator = ticker.MaxNLocator(nbins=4)
             cbar.locator = tick_locator
             cbar.update_ticks()
@@ -2228,7 +2228,7 @@ class Blur(dj.Computed):
             ax.set_yticks([])
             ax.set_title('$corr_{max}$ : %.2f' % (maxr))
             cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.95)
-            cbar.set_label('residual', labelpad=30, rotation=270, y=1.1)
+            cbar.set_label('Residual Error', labelpad=30, rotation=270, y=1.1)
             tick_locator = ticker.MaxNLocator(nbins=4)
             cbar.locator = tick_locator
             cbar.update_ticks()
@@ -2238,6 +2238,144 @@ class Blur(dj.Computed):
 
 
             return fig
+
+@schema
+class NonlinInstBlur(dj.Computed):
+    definition = """
+    -> StimInst
+    -> Blur
+    ---
+    s1d_sta :longblob   # binned 1-dimensional stimulus projected onto sta axis
+    rse_mean    :double # mean of the projected raw stimulus ensemble
+    rse_var     :double # variance of the projected raw stimulus ensemble
+    p_rse   :longblob   # density along 1d axis of raw stimulus ensemble
+    ste_mean    :double # mean of the projected spike-triggered stimulus ensemble
+    ste_var     :double # variance of the projected spike-trigger stimulus ensemble
+    p_ste   :longblob   # density along 1d axis of spike-triggered stimulus ensemble
+    rate    :longblob   # ratio between histograms along 1d stimulus axis
+    """
+
+    def _make_tuples(self, key):
+
+        ntrigger =(Trigger() & key).fetch1['ntrigger']
+        s_inst =(StimInst() & key).fetch1['s_inst']
+        w_sta = (Blur() & key).fetch1['df_z_maxr']
+        y = (StaInst() & key).fetch1['y']
+
+
+        rse1d = np.dot(w_sta, s_inst)
+        nb = 100
+        lim = (rse1d.min() - 1, rse1d.max() + 1)
+        p_rse, vals = np.histogram(rse1d, bins=nb, range=(lim))
+        s1d = vals[0:nb]
+
+        ste1d = []
+
+        for t in range(ntrigger):
+            if y[t] != 0:
+                for sp in range(y[t]):
+                    ste1d.append(rse1d[t])
+        ste1d = np.array(ste1d)
+        p_ste, vals_ste = np.histogram(ste1d, bins=nb, range=(lim))
+
+        rate = p_ste / p_rse/ nb
+
+
+        self.insert1(dict(key,
+                          s1d_sta=s1d,
+                          rse_mean = np.mean(rse1d),
+                          rse_var=np.var(rse1d),
+                          ste_mean=np.mean(ste1d),
+                          ste_var=np.var(ste1d),
+                          p_rse=p_rse,
+                          p_ste=p_ste,
+                          rate=rate
+                          ))
+
+    def plt_1dhistograms(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            nspikes = (Spikes() & key).fetch1['nspikes']
+            ntrigger = (Trigger() & key).fetch1['ntrigger']
+            s1d =(self & key).fetch1['s1d_sta']
+            p_rse,rse_mean,rse_var = (self & key).fetch1['p_rse','rse_mean','rse_var']
+            p_ste, ste_mean, ste_var = (self & key).fetch1['p_ste', 'ste_mean', 'ste_var']
+
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            lim = (s1d.min(),s1d.max())
+            ax.bar(s1d, p_rse / ntrigger, width=.1, label='$p(s)$')
+            ax.bar(s1d, p_ste/ nspikes, width=.1, facecolor=curpal[2], label='$p(s|y)$')
+            ax.axvline(x=rse_mean, color=curpal[1])
+            ax.axvline(x=ste_mean, color=curpal[3])
+            ax.set_xlabel('Projection onto STA axis')
+            ax.set_ylabel('Probability', labelpad=20)
+            ax.legend(fontsize=20)
+            ax.set_xlim(lim)
+            plt.locator_params('y', nbins=4)
+
+            plt.suptitle('Histogram of the raw and spike-triggered stimulus ensemble\n' + str(exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+    def plt_rate(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            s1d,rate = (self & key).fetch1['s1d_sta','rate']
+
+            p_ys = np.nan_to_num(rate)
+
+            fig, ax = plt.subplots()
+
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12)
+            ax.set_xlabel('projection onto STA axis')
+            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
+            plt.locator_params(nbins=4)
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88,left=.1)
+
+            plt.suptitle('Ratio between STE and RSE densities\n' + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
 
 
 @schema
