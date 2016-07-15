@@ -2617,7 +2617,7 @@ class Blur(dj.Computed):
             im = ax.imshow(df_maxr - rf_z, cmap=plt.cm.coolwarm, clim=(-1, 1), interpolation='nearest')
             ax.set_xticks([])
             ax.set_yticks([])
-            ax.set_title('$corr_{max}$ : %.2f' % (maxr))
+            ax.set_title('$\\rho_{max}$ : %.2f' % (maxr))
             cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.95)
             cbar.set_label('Residual Error', labelpad=30, rotation=270, y=1.1)
             tick_locator = ticker.MaxNLocator(nbins=4)
