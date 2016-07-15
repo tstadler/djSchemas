@@ -2259,7 +2259,7 @@ class NonlinInstBlur(dj.Computed):
 
         ntrigger =(Trigger() & key).fetch1['ntrigger']
         s_inst =(StimInst() & key).fetch1['s_inst']
-        w_sta = (Blur() & key).fetch1['df_z_maxr']
+        w_sta = (Blur() & key).fetch1['df_z_maxr'].flatten()
         y = (StaInst() & key).fetch1['y']
 
 
