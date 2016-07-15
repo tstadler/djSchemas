@@ -1800,6 +1800,397 @@ class StaInst(dj.Computed):
 
         self.insert1(dict(key,sta_inst = w_sta,y=y))
 
+
+@schema
+class NonlinInst(dj.Computed):
+    definition = """
+    -> StimInst
+    -> StaInst
+    ---
+    s1d_sta :longblob   # binned 1-dimensional stimulus projected onto sta axis
+    rse_mean    :double # mean of the projected raw stimulus ensemble
+    rse_var     :double # variance of the projected raw stimulus ensemble
+    p_rse   :longblob   # density along 1d axis of raw stimulus ensemble
+    ste_mean    :double # mean of the projected spike-triggered stimulus ensemble
+    ste_var     :double # variance of the projected spike-trigger stimulus ensemble
+    p_ste   :longblob   # density along 1d axis of spike-triggered stimulus ensemble
+    rate    :longblob   # ratio between histograms along 1d stimulus axis
+    """
+
+    @property
+    def populated_from(self):
+        return Recording() & dict(stim_type='bw_noise')
+
+    def _make_tuples(self, key):
+
+        ntrigger =(Trigger() & key).fetch1['ntrigger']
+        s_inst =(StimInst() & key).fetch1['s_inst']
+        w_sta,y = (StaInst() & key).fetch1['sta_inst','y']
+
+
+        rse1d = np.dot(w_sta, s_inst)
+        nb = 100
+        lim = (rse1d.min() - 1, rse1d.max() + 1)
+        p_rse, vals = np.histogram(rse1d, bins=nb, range=(lim))
+        s1d = vals[0:nb]
+
+        ste1d = []
+
+        for t in range(ntrigger):
+            if y[t] != 0:
+                for sp in range(y[t]):
+                    ste1d.append(rse1d[t])
+        ste1d = np.array(ste1d)
+        p_ste, vals_ste = np.histogram(ste1d, bins=nb, range=(lim))
+
+        rate = p_ste / p_rse/ nb
+
+
+        self.insert1(dict(key,
+                          s1d_sta=s1d,
+                          rse_mean = np.mean(rse1d),
+                          rse_var=np.var(rse1d),
+                          ste_mean=np.mean(ste1d),
+                          ste_var=np.var(ste1d),
+                          p_rse=p_rse,
+                          p_ste=p_ste,
+                          rate=rate
+                          ))
+
+    def plt_1dhistograms(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            nspikes = (Spikes() & key).fetch1['nspikes']
+            ntrigger = (Trigger() & key).fetch1['ntrigger']
+            s1d =(self & key).fetch1['s1d_sta']
+            p_rse,rse_mean,rse_var = (self & key).fetch1['p_rse','rse_mean','rse_var']
+            p_ste, ste_mean, ste_var = (self & key).fetch1['p_ste', 'ste_mean', 'ste_var']
+
+            fig, ax = plt.subplots()
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            lim = (s1d.min(),s1d.max())
+            ax.bar(s1d, p_rse / ntrigger, width=.1, label='$p(s)$')
+            ax.bar(s1d, p_ste/ nspikes, width=.1, facecolor=curpal[2], label='$p(s|y)$')
+            ax.axvline(x=rse_mean, color=curpal[1])
+            ax.axvline(x=ste_mean, color=curpal[3])
+            ax.set_xlabel('Projection onto STA axis')
+            ax.set_ylabel('Probability', labelpad=20)
+            ax.legend(fontsize=20)
+            ax.set_xlim(lim)
+            plt.locator_params('y', nbins=4)
+
+            plt.suptitle('Histogram of the raw and spike-triggered stimulus ensemble\n' + str(exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+    def plt_rate(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            s1d,rate = (self & key).fetch1['s1d_sta','rate']
+
+            p_ys = np.nan_to_num(rate)
+
+            fig, ax = plt.subplots()
+
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12)
+            ax.set_xlabel('projection onto STA axis')
+            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
+            plt.locator_params(nbins=4)
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88,left=.1)
+
+            plt.suptitle('Ratio between STE and RSE densities\n' + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+@schema
+class NonlinInstExp(dj.Computed):
+    definition = """
+    -> NonlinInst
+    ---
+    aopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    bopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    copt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    res     :double     # absolute residuals
+
+    """
+
+    def _make_tuples(self, key):
+
+        nspikes = (Spikes() & key).fetch1['nspikes']
+        s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+        p_ys = np.nan_to_num(rate)
+
+        try:
+            popt, pcov = scoptimize.curve_fit(self.non_lin_exp, s1d[p_ys != 0], p_ys[p_ys != 0])
+
+        except Exception as e1:
+            print('Exponential fit failed due to:\n', e1)
+            popt=(0,0,0)
+
+        aopt, bopt, copt = popt
+
+        res = abs(self.non_lin_exp(s1d[p_ys != 0], aopt, bopt, copt) - p_ys[p_ys != 0]).sum()/nspikes
+
+        self.insert1(dict(key,
+                          aopt=aopt,
+                          bopt=bopt,
+                          copt=copt,
+                          res = res))
+
+
+    def non_lin_exp(self,x,a,b,c):
+        return a * np.exp(b * x) + c
+
+    def plt_rate(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+            aopt,bopt,copt,res = (self & key).fetch1['aopt','bopt','copt','res']
+
+
+            p_ys = np.nan_to_num(rate)
+            f = self.non_lin_exp(s1d,aopt,bopt,copt)
+
+            fig, ax = plt.subplots()
+
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
+            ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
+            ax.set_xlabel('projection onto STA axis')
+            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
+            plt.locator_params(nbins=4)
+            ax.legend()
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+@schema
+class NonlinInstSoftmax(dj.Computed):
+    definition = """
+    -> NonlinInst
+    ---
+    aopt    :double     # parameter fit for softmax func as instantaneous non-linearity
+    topt    :double     # parameter fit for softmax func as instantaneous non-linearity
+    res     :double     # absolute residuals
+
+    """
+
+    def _make_tuples(self, key):
+
+        nspikes = (Spikes() & key).fetch1['nspikes']
+        s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+        p_ys = np.nan_to_num(rate)
+
+        try:
+            popt, pcov = scoptimize.curve_fit(self.softmax, s1d[p_ys != 0], p_ys[p_ys != 0])
+
+        except Exception as e1:
+            print('Exponential fit failed due to:\n', e1)
+            popt=(0,0)
+
+        aopt, topt = popt
+
+        res = abs(self.softmax(s1d[p_ys!=0],aopt,topt) - p_ys[p_ys!=0]).sum()/nspikes
+
+        self.insert1(dict(key,
+                          aopt=aopt,
+                          topt = topt,
+                          res = res))
+
+    def softmax(self,x, a, t):
+        ex = np.exp(x - a) / t
+        sm = ex / ex.sum()
+
+        return sm
+
+    def plt_rate(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+            aopt,topt,res = (self & key).fetch1['aopt','topt','res']
+
+
+            p_ys = np.nan_to_num(rate)
+            f = self.softmax(s1d,aopt,topt)
+
+            fig, ax = plt.subplots()
+
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
+            ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
+            ax.set_xlabel('projection onto STA axis')
+            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
+            plt.locator_params(nbins=4)
+            ax.legend()
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88,left=.1)
+            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+@schema
+class NonlinInstThreshold(dj.Computed):
+    definition = """
+    -> NonlinInst
+    ---
+    aopt    :double     # parameter fit for piecewise threshold func as instantaneous non-linearity
+    thropt  :double   # parameter fit for piecewise threshold func as instantaneous non-linearity
+    res     :double     # absolute residuals
+
+    """
+
+    def _make_tuples(self, key):
+
+        nspikes = (Spikes() & key).fetch1['nspikes']
+        s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+        p_ys = np.nan_to_num(rate)
+
+        try:
+            popt, pcov = scoptimize.curve_fit(self.threshold, s1d[p_ys != 0], p_ys[p_ys != 0])
+
+        except Exception as e1:
+            print('Exponential fit failed due to:\n', e1)
+            popt=(0,0)
+
+        aopt, thropt = popt
+
+        res = abs(self.threshold(s1d[p_ys!=0],aopt,thropt) - p_ys[p_ys!=0]).sum()/nspikes
+
+        self.insert1(dict(key,
+                          aopt=aopt,
+                          thropt = thropt,
+                          res = res))
+
+    def threshold(self,x, a, thr):
+
+        return np.piecewise(x, [x < thr, x >= thr], [0, lambda x: a * x])
+
+    def plt_rate(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
+            aopt,thropt,res = (self & key).fetch1['aopt','thropt','res']
+
+
+            p_ys = np.nan_to_num(rate)
+            f = self.threshold(s1d,aopt,thropt)
+
+            fig, ax = plt.subplots()
+
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
+            ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
+            ax.set_xlabel('projection onto STA axis')
+            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
+            plt.locator_params(nbins=4)
+            ax.legend()
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88,left=.1)
+
+            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+
 @schema
 class Overlay(dj.Computed):
 
@@ -2858,394 +3249,6 @@ class StcInstPca(dj.Computed):
             return fig
 
 
-@schema
-class NonlinInst(dj.Computed):
-    definition = """
-    -> StimInst
-    -> StaInst
-    ---
-    s1d_sta :longblob   # binned 1-dimensional stimulus projected onto sta axis
-    rse_mean    :double # mean of the projected raw stimulus ensemble
-    rse_var     :double # variance of the projected raw stimulus ensemble
-    p_rse   :longblob   # density along 1d axis of raw stimulus ensemble
-    ste_mean    :double # mean of the projected spike-triggered stimulus ensemble
-    ste_var     :double # variance of the projected spike-trigger stimulus ensemble
-    p_ste   :longblob   # density along 1d axis of spike-triggered stimulus ensemble
-    rate    :longblob   # ratio between histograms along 1d stimulus axis
-    """
-
-    @property
-    def populated_from(self):
-        return Recording() & dict(stim_type='bw_noise')
-
-    def _make_tuples(self, key):
-
-        ntrigger =(Trigger() & key).fetch1['ntrigger']
-        s_inst =(StimInst() & key).fetch1['s_inst']
-        w_sta,y = (StaInst() & key).fetch1['sta_inst','y']
-
-
-        rse1d = np.dot(w_sta, s_inst)
-        nb = 100
-        lim = (rse1d.min() - 1, rse1d.max() + 1)
-        p_rse, vals = np.histogram(rse1d, bins=nb, range=(lim))
-        s1d = vals[0:nb]
-
-        ste1d = []
-
-        for t in range(ntrigger):
-            if y[t] != 0:
-                for sp in range(y[t]):
-                    ste1d.append(rse1d[t])
-        ste1d = np.array(ste1d)
-        p_ste, vals_ste = np.histogram(ste1d, bins=nb, range=(lim))
-
-        rate = p_ste / p_rse/ nb
-
-
-        self.insert1(dict(key,
-                          s1d_sta=s1d,
-                          rse_mean = np.mean(rse1d),
-                          rse_var=np.var(rse1d),
-                          ste_mean=np.mean(ste1d),
-                          ste_var=np.var(ste1d),
-                          p_rse=p_rse,
-                          p_ste=p_ste,
-                          rate=rate
-                          ))
-
-    def plt_1dhistograms(self):
-
-        plt.rcParams.update(
-            {'figure.figsize': (12, 6),
-             'axes.titlesize': 16,
-             'axes.labelsize': 16,
-             'xtick.labelsize': 16,
-             'ytick.labelsize': 16,
-             'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .2
-             }
-        )
-        curpal = sns.color_palette()
-
-        for key in self.project().fetch.as_dict:
-            fname = key['filename']
-            exp_date = (Experiment() & key).fetch1['exp_date']
-            eye = (Experiment() & key).fetch1['eye']
-            nspikes = (Spikes() & key).fetch1['nspikes']
-            ntrigger = (Trigger() & key).fetch1['ntrigger']
-            s1d =(self & key).fetch1['s1d_sta']
-            p_rse,rse_mean,rse_var = (self & key).fetch1['p_rse','rse_mean','rse_var']
-            p_ste, ste_mean, ste_var = (self & key).fetch1['p_ste', 'ste_mean', 'ste_var']
-
-            fig, ax = plt.subplots()
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88)
-
-            lim = (s1d.min(),s1d.max())
-            ax.bar(s1d, p_rse / ntrigger, width=.1, label='$p(s)$')
-            ax.bar(s1d, p_ste/ nspikes, width=.1, facecolor=curpal[2], label='$p(s|y)$')
-            ax.axvline(x=rse_mean, color=curpal[1])
-            ax.axvline(x=ste_mean, color=curpal[3])
-            ax.set_xlabel('Projection onto STA axis')
-            ax.set_ylabel('Probability', labelpad=20)
-            ax.legend(fontsize=20)
-            ax.set_xlim(lim)
-            plt.locator_params('y', nbins=4)
-
-            plt.suptitle('Histogram of the raw and spike-triggered stimulus ensemble\n' + str(exp_date) + ': ' + eye + ': ' + fname,
-                         fontsize=16)
-
-            return fig
-
-    def plt_rate(self):
-
-        plt.rcParams.update(
-            {'figure.figsize': (12, 6),
-             'axes.titlesize': 16,
-             'axes.labelsize': 16,
-             'xtick.labelsize': 16,
-             'ytick.labelsize': 16,
-             'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .2
-             }
-        )
-        curpal = sns.color_palette()
-
-        for key in self.project().fetch.as_dict:
-
-            fname = key['filename']
-            exp_date = (Experiment() & key).fetch1['exp_date']
-            eye = (Experiment() & key).fetch1['eye']
-
-            s1d,rate = (self & key).fetch1['s1d_sta','rate']
-
-            p_ys = np.nan_to_num(rate)
-
-            fig, ax = plt.subplots()
-
-            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12)
-            ax.set_xlabel('projection onto STA axis')
-            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
-            plt.locator_params(nbins=4)
-
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88,left=.1)
-
-            plt.suptitle('Ratio between STE and RSE densities\n' + str(
-                exp_date) + ': ' + eye + ': ' + fname,
-                         fontsize=16)
-
-            return fig
-
-@schema
-class NonlinInstExp(dj.Computed):
-    definition = """
-    -> NonlinInst
-    ---
-    aopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
-    bopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
-    copt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
-    res     :double     # absolute residuals
-
-    """
-
-    def _make_tuples(self, key):
-
-        nspikes = (Spikes() & key).fetch1['nspikes']
-        s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
-        p_ys = np.nan_to_num(rate)
-
-        try:
-            popt, pcov = scoptimize.curve_fit(self.non_lin_exp, s1d[p_ys != 0], p_ys[p_ys != 0])
-
-        except Exception as e1:
-            print('Exponential fit failed due to:\n', e1)
-            popt=(0,0,0)
-
-        aopt, bopt, copt = popt
-
-        res = abs(self.non_lin_exp(s1d[p_ys != 0], aopt, bopt, copt) - p_ys[p_ys != 0]).sum()/nspikes
-
-        self.insert1(dict(key,
-                          aopt=aopt,
-                          bopt=bopt,
-                          copt=copt,
-                          res = res))
-
-
-    def non_lin_exp(self,x,a,b,c):
-        return a * np.exp(b * x) + c
-
-    def plt_rate(self):
-
-        plt.rcParams.update(
-            {'figure.figsize': (12, 6),
-             'axes.titlesize': 16,
-             'axes.labelsize': 16,
-             'xtick.labelsize': 16,
-             'ytick.labelsize': 16,
-             'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .2
-             }
-        )
-        curpal = sns.color_palette()
-
-        for key in self.project().fetch.as_dict:
-
-            fname = key['filename']
-            exp_date = (Experiment() & key).fetch1['exp_date']
-            eye = (Experiment() & key).fetch1['eye']
-
-            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
-            aopt,bopt,copt,res = (self & key).fetch1['aopt','bopt','copt','res']
-
-
-            p_ys = np.nan_to_num(rate)
-            f = self.non_lin_exp(s1d,aopt,bopt,copt)
-
-            fig, ax = plt.subplots()
-
-            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
-            ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
-            ax.set_xlabel('projection onto STA axis')
-            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
-            plt.locator_params(nbins=4)
-            ax.legend()
-
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88)
-
-            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
-                exp_date) + ': ' + eye + ': ' + fname,
-                         fontsize=16)
-
-            return fig
-
-@schema
-class NonlinInstSoftmax(dj.Computed):
-    definition = """
-    -> NonlinInst
-    ---
-    aopt    :double     # parameter fit for softmax func as instantaneous non-linearity
-    topt    :double     # parameter fit for softmax func as instantaneous non-linearity
-    res     :double     # absolute residuals
-
-    """
-
-    def _make_tuples(self, key):
-
-        nspikes = (Spikes() & key).fetch1['nspikes']
-        s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
-        p_ys = np.nan_to_num(rate)
-
-        try:
-            popt, pcov = scoptimize.curve_fit(self.softmax, s1d[p_ys != 0], p_ys[p_ys != 0])
-
-        except Exception as e1:
-            print('Exponential fit failed due to:\n', e1)
-            popt=(0,0)
-
-        aopt, topt = popt
-
-        res = abs(self.softmax(s1d[p_ys!=0],aopt,topt) - p_ys[p_ys!=0]).sum()/nspikes
-
-        self.insert1(dict(key,
-                          aopt=aopt,
-                          topt = topt,
-                          res = res))
-
-    def softmax(self,x, a, t):
-        ex = np.exp(x - a) / t
-        sm = ex / ex.sum()
-
-        return sm
-
-    def plt_rate(self):
-
-        plt.rcParams.update(
-            {'figure.figsize': (12, 6),
-             'axes.titlesize': 16,
-             'axes.labelsize': 16,
-             'xtick.labelsize': 16,
-             'ytick.labelsize': 16,
-             'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .2
-             }
-        )
-        curpal = sns.color_palette()
-
-        for key in self.project().fetch.as_dict:
-
-            fname = key['filename']
-            exp_date = (Experiment() & key).fetch1['exp_date']
-            eye = (Experiment() & key).fetch1['eye']
-
-            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
-            aopt,topt,res = (self & key).fetch1['aopt','topt','res']
-
-
-            p_ys = np.nan_to_num(rate)
-            f = self.softmax(s1d,aopt,topt)
-
-            fig, ax = plt.subplots()
-
-            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
-            ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
-            ax.set_xlabel('projection onto STA axis')
-            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
-            plt.locator_params(nbins=4)
-            ax.legend()
-
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88,left=.1)
-            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
-                exp_date) + ': ' + eye + ': ' + fname,
-                         fontsize=16)
-
-            return fig
-
-@schema
-class NonlinInstThreshold(dj.Computed):
-    definition = """
-    -> NonlinInst
-    ---
-    aopt    :double     # parameter fit for piecewise threshold func as instantaneous non-linearity
-    thropt  :double   # parameter fit for piecewise threshold func as instantaneous non-linearity
-    res     :double     # absolute residuals
-
-    """
-
-    def _make_tuples(self, key):
-
-        nspikes = (Spikes() & key).fetch1['nspikes']
-        s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
-        p_ys = np.nan_to_num(rate)
-
-        try:
-            popt, pcov = scoptimize.curve_fit(self.threshold, s1d[p_ys != 0], p_ys[p_ys != 0])
-
-        except Exception as e1:
-            print('Exponential fit failed due to:\n', e1)
-            popt=(0,0)
-
-        aopt, thropt = popt
-
-        res = abs(self.threshold(s1d[p_ys!=0],aopt,thropt) - p_ys[p_ys!=0]).sum()/nspikes
-
-        self.insert1(dict(key,
-                          aopt=aopt,
-                          thropt = thropt,
-                          res = res))
-
-    def threshold(self,x, a, thr):
-
-        return np.piecewise(x, [x < thr, x >= thr], [0, lambda x: a * x])
-
-    def plt_rate(self):
-
-        plt.rcParams.update(
-            {'figure.figsize': (12, 6),
-             'axes.titlesize': 16,
-             'axes.labelsize': 16,
-             'xtick.labelsize': 16,
-             'ytick.labelsize': 16,
-             'figure.subplot.hspace': .2,
-             'figure.subplot.wspace': .2
-             }
-        )
-        curpal = sns.color_palette()
-
-        for key in self.project().fetch.as_dict:
-
-            fname = key['filename']
-            exp_date = (Experiment() & key).fetch1['exp_date']
-            eye = (Experiment() & key).fetch1['eye']
-
-            s1d,rate = (NonlinInst() & key).fetch1['s1d_sta','rate']
-            aopt,thropt,res = (self & key).fetch1['aopt','thropt','res']
-
-
-            p_ys = np.nan_to_num(rate)
-            f = self.threshold(s1d,aopt,thropt)
-
-            fig, ax = plt.subplots()
-
-            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
-            ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
-            ax.set_xlabel('projection onto STA axis')
-            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
-            plt.locator_params(nbins=4)
-            ax.legend()
-
-            fig.tight_layout()
-            fig.subplots_adjust(top=.88,left=.1)
-
-            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
-                exp_date) + ': ' + eye + ': ' + fname,
-                         fontsize=16)
-
-            return fig
 
 
 @schema
@@ -4645,6 +4648,160 @@ class PredStaInst(dj.Computed):
 
             return fig
 
+@schema
+class PredStaInstBlur(dj.Computed):
+    definition="""
+    -> Blur
+    -> StimInst
+    ---
+    r       :longblob                           # predicted rate
+    k       :double                             # split for cross-validation
+    rho     :double                             # mean correlation coefficient
+    res     :double                             # mean ordinaray test error
+    nl_type :enum('exp','sm','thr','none')      # type of rectifying non-linearity used, selected as best fitting from those three
+    """
+
+    def _make_tuples(self,key):
+
+        ntrigger = (Trigger() & key).fetch1['ntrigger']
+
+        # fetch spike counts
+        y = (StaInst() & key).fetch1['y']
+
+        # fetch stimulus
+
+        s_inst = (StimInst() & key).fetch1['s_inst']
+        s = s_inst[:, 0:ntrigger]
+
+        # fetch best fitting non-linearity:
+        res_exp = (NonlinInstExpBlur() & key).fetch1['res']
+        res_sm = (NonlinInstSoftmaxBlur() & key).fetch1['res']
+        res_thr = (NonlinInstThresholdBlur() & key).fetch1['res']
+
+        res = np.array([res_exp, res_sm, res_thr])
+
+        id_nl = res.argmin()
+
+        if id_nl == 0:
+            aopt, bopt, copt = (NonlinInstExp() & key).fetch1['aopt', 'bopt', 'copt']
+
+            def non_lin(x):
+                return aopt * np.exp(bopt * x) + copt
+
+            nl_type = 'exp'
+
+        elif id_nl == 1:
+            aopt, topt = (NonlinInstSoftmax() & key).fetch1['aopt', 'topt']
+
+            def non_lin(x):
+                ex = np.exp(x - aopt) /topt
+                return ex / ex.sum()
+
+            nl_type = 'sm'
+
+        elif id_nl == 2:
+            aopt, topt = (NonlinInstThreshold() & key).fetch1['aopt', 'thropt']
+
+            def non_lin(x):
+                return np.piecewise(x, [x < topt, x >= topt], [0, lambda x: aopt * x])
+
+            nl_type = 'thr'
+        else:
+            print('Optimal non-linearity not found! Using linear prediction')
+
+            def non_lin(x):
+                return x
+
+            nl_type ='none'
+
+        w = (Blur() & key).fetch1['df_z_maxr'].flatten()
+        r0 = np.dot(w, s)
+        r = non_lin(r0)
+        rho = np.cor
+        err = np.square(y / ntrigger - r).sum() / len(y)
+        np.corrcoef(r, y)[0, 1]
+
+        self.insert1(dict(key,
+                            r = r,
+                            rho = rho,
+                            res = err,
+                            nl_type = nl_type
+        ))
+
+    def plt_pred(self,):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            freq = (StimMeta() & key).fetch1['freq']
+            ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
+
+            w,sigma = (Blur() & key).fetch1['df_z_maxr','sig_maxr']
+            y = (StaInst() & key).fetch1['y']
+            r_all = (self & key).fetch1['r']
+            rho,nl_type = (self & key).fetch1['rho','nl_type']
+
+            start = 200
+            end = 400
+            t = np.linspace(start / freq, end / freq, end - start)
+
+            fig = plt.figure()
+            gs1 = gridsp.GridSpec(2, 1)
+            gs1.update(left=.05, right=.5)
+            ax0 = plt.subplot(gs1[:, :])
+            im = ax0.imshow(w, cmap=plt.cm.coolwarm_r, interpolation='nearest')
+            cbar = plt.colorbar(im, ax=ax0, shrink=.88)
+            ax0.set_xticklabels([])
+            ax0.set_yticklabels([])
+            ax0.set_title('Filter')
+            # cbar.set_label('stim intensity', labelpad=20, rotation=270)
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            gs2 = gridsp.GridSpec(2, 1)
+            gs2.update(left=.55, right=.95)
+            ax1 = plt.subplot(gs2[0, :])
+            # ax1.plot(t,y[start:end],label='prediction')
+            ax1.plot(t, y[start:end], label='data')
+            ax1.set_xlim([start / freq, end / freq])
+            ax1.set_ylabel('spike counts')
+            ax1.legend()
+            ax1.set_title('$\\rho$ = %.2f' %rho)
+            ax1.locator_params(nbins=4)
+            plt.setp(ax1.get_xticklabels(), visible=False)
+            ax1.set_yticklabels([])
+
+            ax2 = plt.subplot(gs2[1, :], sharex=ax1)
+            ax2.plot(t, r_all[start:end], label='rate $\lambda$')
+            ax2.legend()
+            ax2.set_xlabel('time [s]')
+            ax2.set_ylabel('firing rate')
+            ax2.set_xlim([start / freq, end / freq])
+            ax2.set_yticklabels([])
+
+            ax2.locator_params(nbins=4)
+
+            plt.suptitle('Blurred DF with  $\sigma$ = %.0f \n'%sigma  + 'Non-Linearity: '+ nl_type + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
 
 @schema
 class PredStaInstRidge(dj.Computed):
