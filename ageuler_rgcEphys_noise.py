@@ -5254,7 +5254,7 @@ class LnpExp(dj.Computed):
 
         res = scoptimize.minimize(self.ll_exp, pars0, args=(s, y, -1), jac=True)
 
-        nll = res.fun[0]
+        nll = res.fun
         w_opt = res.x[0:ns]
         b_opt = res.x[ns]
 
