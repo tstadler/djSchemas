@@ -4655,7 +4655,6 @@ class PredStaInstBlur(dj.Computed):
     -> StimInst
     ---
     r       :longblob                           # predicted rate
-    k       :double                             # split for cross-validation
     rho     :double                             # mean correlation coefficient
     res     :double                             # mean ordinaray test error
     nl_type :enum('exp','sm','thr','none')      # type of rectifying non-linearity used, selected as best fitting from those three
@@ -4717,9 +4716,8 @@ class PredStaInstBlur(dj.Computed):
         w = (Blur() & key).fetch1['df_z_maxr'].flatten()
         r0 = np.dot(w, s)
         r = non_lin(r0)
-        rho = np.cor
         err = np.square(y / ntrigger - r).sum() / len(y)
-        np.corrcoef(r, y)[0, 1]
+        rho = np.corrcoef(r, y)[0, 1]
 
         self.insert1(dict(key,
                             r = r,
