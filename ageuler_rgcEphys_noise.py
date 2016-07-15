@@ -157,22 +157,36 @@ class Morph(dj.Computed):
             clim = (0,.01)
 
             fig = plt.figure()
-            fig.add_subplot(1, 2, 1)
-            plt.imshow(morph, clim=clim)
+            gs1 = gridsp.GridSpec(2, 1)
+            gs1.update(left=0.05, right=.5)
+            ax0 = plt.subplot(gs1[:, :])
+            ax0.imshow(morph, clim=clim)
+            ax0.set_xticks([])
+            ax0.set_yticks([])
+            ax0.annotate('df size in x [um]: %.2f\ndf size in y [um]: %.2f' % (df_size_x, df_size_y), xy=(20, 20),
+                           fontsize=14)
 
-            fig.add_subplot(2, 2, 2)
-            plt.imshow(morph_vert1, clim=clim)
+            gs2 = gridsp.GridSpec(2, 1)
+            gs2.update(left=.5, right=.88)
+            ax1 = plt.subplot(gs2[0, :])
+            ax1.imshow(morph_vert1, clim=clim, aspect=3)
+            ax1.set_yticks([10, stack.shape[0] - 10])
+            ax1.set_xticks([])
+            ax1.yaxis.tick_right()
+            ax1.set_yticklabels(['IPL', 'GCL'])
 
-            fig.add_subplot(2, 2, 4)
-            plt.imshow(morph_vert2, clim=clim)
+            ax2 = plt.subplot(gs2[1, :], sharex=ax1)
+            ax2.imshow(morph_vert2, clim=clim, aspect=3)
+            ax2.set_xticks([])
+            ax2.set_yticks([10, stack.shape[0] - 10])
+            ax2.yaxis.tick_right()
+            ax2.set_yticklabels(['IPL', 'GCL'])
 
-            ax = fig.get_axes()
-            ax[0].annotate('df size in x [um]: %.2f\ndf size in y [um]: %.2f'%(df_size_x,df_size_y),xy = (20,20),fontsize=14)
 
             plt.suptitle('Linestack\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
 
-            plt.tight_layout()
-            plt.subplots_adjust(top=.8)
+            fig.tight_layout()
+            fig.subplots_adjust(top=.8)
 
             return fig
 
