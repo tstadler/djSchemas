@@ -64,6 +64,357 @@ class Cell(dj.Manual):
     morphology  : boolean           # morphology was recorded or not
     type        : varchar(200)      # putative RGC type
     """
+@schema
+class Morph(dj.Computed):
+    definition="""
+    # Reconstructed morphology of the cell as a line-stack
+    -> Cell
+    ---
+    stack       :longblob       # array (scan_z x scan_x x scan_y)
+    scan_z      :int            # number of consecutive frames in depth
+    scan_y      :int            # scan field y dim
+    scan_x      :int            # scan field x dim
+    dx          :double         # pixel side length in um
+    dy          :double         # pixel side length in um
+    zoom        :double         # zoom factor
+    scan_size   :double         # side length of scan in um
+    df_size_x   :double         # df size in um
+    df_size_y   :double         # df size in um
+    """
+
+    @property
+    def populated_from(self):
+        return Cell() & dict(morphology = True)
+
+    def _make_tuples(self,key):
+
+        path = (Experiment() & key).fetch1['path']
+        exp_date = (Experiment() & key).fetch1['exp_date']
+        folder = (Cell() & key).fetch1['folder']
+        cell_id = (Cell() & key).fetch1['cell_id']
+
+        full_path = path + folder + 'linestack.tif'
+
+        stack = tf.imread(full_path)
+
+        # binarize and invert x-axis for proper orientation
+
+        stack_bin = np.zeros(stack.shape)
+        for z in range(stack.shape[0]):
+            stack_bin[z, :, :] = binarize(stack[z, ::-1, :], threshold=0, copy=True)
+
+        config = ConfigParser()
+        config.read(path + folder + 'C' + str(cell_id) + '_' + str(exp_date) + '.ini')
+        zoom = config.getfloat('morph', 'zoom')
+        scan_size = 1/ zoom * 71.5  # side length of stack image in um
+
+        scan_x = stack.shape[1]
+        scan_y = stack.shape[2]
+
+        dx_morph = scan_size / scan_x  # morph pixel side length in um
+        dy_morph = scan_size / scan_y  # morph pixel side length in um
+
+        morph = np.mean(stack, 0)
+
+        mask = np.ma.masked_where(morph == 0, morph)
+
+        edges0 = np.ma.notmasked_edges(mask, axis=0)
+        edges1 = np.ma.notmasked_edges(mask, axis=1)
+
+        dely = edges0[1][0] - edges0[0][0]
+        delx = edges1[1][1] - edges1[0][1]
+
+        df_size_x = (delx.max() + 1) * dx_morph
+        df_size_y = (dely.max() + 1) * dy_morph
+
+        self.insert1(dict(key, stack = stack_bin[::-1], scan_z = stack.shape[0], scan_y = scan_y, scan_x = scan_x,dx=dx_morph, dy=dy_morph, zoom = zoom, scan_size=scan_size,df_size_x = df_size_x,df_size_y = df_size_y))
+
+    def plt_morph(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 10),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': 0,
+             'figure.subplot.wspace': .2
+             }
+        )
+
+        for key in self.project().fetch.as_dict:
+
+            stack = (self & key).fetch1['stack']
+            df_size_x, df_size_y = (self & key).fetch1['df_size_x', 'df_size_y']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
+            morph_vert1 = np.mean(stack[::-1], 1)
+            morph_vert2 = np.mean(stack[::-1], 2)
+            morph = np.mean(stack, 0)
+            clim = (0,.01)
+
+            fig = plt.figure()
+            fig.add_subplot(1, 2, 1)
+            plt.imshow(morph, clim=clim)
+
+            fig.add_subplot(2, 2, 2)
+            plt.imshow(morph_vert1, clim=clim)
+
+            fig.add_subplot(2, 2, 4)
+            plt.imshow(morph_vert2, clim=clim)
+
+            ax = fig.get_axes()
+            ax[0].annotate('df size in x [um]: %.2f\ndf size in y [um]: %.2f'%(df_size_x,df_size_y),xy = (20,20),fontsize=14)
+
+            plt.suptitle('Linestack\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+
+            plt.tight_layout()
+            plt.subplots_adjust(top=.8)
+
+            return fig
+
+
+@schema
+class Cut(dj.Computed):
+
+    definition="""
+    # Cut soma from Morphology to get DF
+
+    ->Morph
+    ---
+    stack_wos   :longblob
+    dens1       :longblob
+    dens2       :longblob
+    idx_thr1    :longblob
+    idx_thr2    :longblob
+    idx_cut     :int
+    """
+
+    def _make_tuples(self,key):
+
+        stack = (Morph() & key).fetch1['stack']
+
+        morph_vert1 = np.mean(stack, 1)
+        morph_vert2 = np.mean(stack, 2)
+
+        ma_vert1 = np.ma.masked_where(morph_vert1 == 0, morph_vert1)
+        ma_vert2 = np.ma.masked_where(morph_vert2 == 0, morph_vert2)
+
+        counts1 = ma_vert1.count(axis=1)
+        dens1 = counts1 / counts1.sum()
+
+        counts2 = ma_vert2.count(axis=1)
+        dens2 = counts2 / counts2.sum()
+
+        idx_thr1 = np.where(dens1 == dens1[dens1 != 0].min())[0]
+        idx_thr2 = np.where(dens2 == dens2[dens2 != 0].min())[0]
+
+        fig_c = self.show_cut(stack,idx_thr1,idx_thr2)
+        display(fig_c)
+        plt.close(fig_c)
+
+        adjust = bool(int(input('Adjust cut off? [Yes:1 , No:0]: ')))
+
+        if adjust:
+            fig_d = self.show_density(dens1,dens2,idx_thr1,idx_thr2)
+            display(fig_d)
+            plt.close(fig_d)
+
+            idx_cut = int(input('Select frame [int] above which everything will be cut off: '))
+
+        else:
+            idx_cut1 = idx_thr1.max()
+            idx_cut2 = idx_thr2.max()
+
+            idx_cut = np.max([idx_cut1, idx_cut2])
+
+        morph = np.mean(stack[0:idx_cut, :, :], 0)
+
+
+
+        self.insert1(dict(key,stack_wos = stack[0:idx_cut,:,:], dens1 = dens1, dens2 = dens2,idx_thr1 = idx_thr1, idx_thr2 = idx_thr2, idx_cut = idx_cut))
+
+    def show_cut(self, stack, idx_thr1, idx_thr2):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2,
+             'lines.linewidth': 1
+             }
+        )
+
+        morph_vert1 = np.mean(stack, 1)
+        morph_vert2 = np.mean(stack, 2)
+
+        idx_cut1 = idx_thr1.max()
+        idx_cut2 = idx_thr2.max()
+
+        with sns.axes_style({'grid.color': 'r'}):
+            fig_cut, ax = plt.subplots(2, 1)
+            clim = (0, .01)
+
+            ax[0].imshow(morph_vert1, clim=clim)
+            ax[0].set_yticks([idx_cut1])
+            ax[0].set_xticks([])
+
+            ax[1].imshow(morph_vert2, clim=clim)
+            ax[1].set_yticks([idx_cut2])
+            ax[1].set_xticks([])
+
+            fig_cut.tight_layout()
+            fig_cut.subplots_adjust(top=.88)
+
+            return fig_cut
+
+    def show_density(self, dens1, dens2, idx_thr1, idx_thr2):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2,
+             'lines.linewidth': 1
+             }
+        )
+
+        cur_pal = sns.color_palette()
+
+        cols1 = [cur_pal[0]] * len(dens1)
+        for i in idx_thr1:
+            cols1[i] = cur_pal[2]
+
+        cols2 = [cur_pal[0]] * len(dens2)
+        for i in idx_thr2:
+            cols2[i] = cur_pal[2]
+
+        width = .8
+        x = np.linspace(0, dens1.shape[0] - width, dens1.shape[0])
+        fig, ax = plt.subplots(1, 2, sharey=True)
+        ax[0].bar(x, dens1, color=cols1)
+        ax[0].set_xlabel('stack height')
+        ax[0].set_ylabel('density of non-zero data points', labelpad=20)
+        ax[0].set_xlim([0, dens1.shape[0]])
+
+        plt.locator_params(axis='y', nbins=4)
+
+        ax[1].bar(x, dens2, color=cols2)
+        ax[1].set_xlabel('stack height')
+        ax[1].set_xlim([0, dens2.shape[0]])
+
+        plt.locator_params(axis='y', nbins=4)
+        fig.tight_layout()
+        fig.subplots_adjust(top=.88)
+
+        return fig
+
+    def plt_cut(self):
+
+        for key in self.project().fetch.as_dict:
+            plt.rcParams.update(
+                {'figure.figsize': (15, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .2,
+                 'lines.linewidth': 1
+                 }
+            )
+            stack = (Morph() & key).fetch1['stack'][::-1]
+            idx_cut = (self & key).fetch1['idx_cut']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
+            morph_vert1 = np.mean(stack, 1)
+            morph_vert2 = np.mean(stack, 2)
+
+            with sns.axes_style({'grid.color': 'r'}):
+                fig_cut, ax = plt.subplots(2, 1)
+                clim = (0, .01)
+
+                ax[0].imshow(morph_vert1, clim=clim)
+                ax[0].set_yticks([idx_cut])
+                ax[0].set_xticks([])
+
+                ax[1].imshow(morph_vert2, clim=clim)
+                ax[1].set_yticks([idx_cut])
+                ax[1].set_xticks([])
+
+                fig_cut.tight_layout()
+                fig_cut.subplots_adjust(top=.88)
+
+                return fig_cut
+
+    def plt_density(self):
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (15, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .2,
+                 'lines.linewidth': 1
+                 }
+            )
+            dens1, dens2 = (self & key).fetch1['dens1', 'dens2']
+            idx_thr1, idx_thr2 = (self & key).fetch1['idx_thr1', 'idx_thr2']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
+            cur_pal = sns.color_palette()
+
+            cols1 = [cur_pal[0]] * len(dens1)
+            for i in idx_thr1:
+                cols1[i] = cur_pal[1]
+
+            cols2 = [cur_pal[0]] * len(dens2)
+            for i in idx_thr2:
+                cols2[i] = cur_pal[1]
+
+            width = .8
+            x = np.linspace(0, dens1.shape[0] - width, dens1.shape[0])
+            fig, ax = plt.subplots(1, 2, sharey=True)
+            ax[0].bar(x, dens1, color=cols1)
+            ax[0].set_xlabel('stack height')
+            ax[0].set_ylabel('density of non-zero data points', labelpad=20)
+            ax[0].set_xticks([10, dens1.shape[0] - 10])
+            ax[0].set_xticklabels(['IPL', 'GCL'])
+
+            plt.locator_params(axis='y', nbins=4)
+
+            ax[1].bar(x, dens2, color=cols2)
+            ax[1].set_xlabel('stack height')
+            ax[1].set_xticks([10, dens2.shape[0] - 10])
+            ax[1].set_xticklabels(['IPL', 'GCL'])
+
+            plt.locator_params(axis='y', nbins=4)
+
+            fig.suptitle('Density profile\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id), fontsize=16)
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            return fig
+
 
 @schema
 class Recording(dj.Manual):
@@ -1438,6 +1789,264 @@ class StaInst(dj.Computed):
 
         self.insert1(dict(key,sta_inst = w_sta,y=y))
 
+@schema
+class Overlay(dj.Computed):
+
+    definition="""
+    # Overlay of linestack and receptive field map
+
+    -> Cut
+    -> StaInst
+    ---
+    morph_pad       :longblob   # morphology padded to rf map size
+    morph_shift     :longblob   # morphology with com shifted onto rf center
+    rf_pad          :longblob   # receptive field map upsampled to morph resolution
+    idx_center      :blob       # tuple with rf center indices
+    idx_soma        :blob       # tuple with com of padded morph
+    shift_x         :int        # number of pixels shifted in x dim
+    shift_y         :int        # number of pixels shifted in y dim
+
+    """
+
+    def _make_tuples(self,key):
+
+        stack = (Cut() & key).fetch1['stack_wos']
+        scan_size = (Morph() & key).fetch1['scan_size']
+        (dx_morph, dy_morph) = (Morph() & key).fetch1['dx','dy']
+        (dx, dy) = (StimMeta() & key).fetch1['delx', 'dely']
+
+        rf = (StaInst() & key).fetch1['sta_inst']
+
+
+        morph = np.mean(stack, 0)
+
+        dely = (rf.shape[1] * dy - scan_size) / 2  # missing at each side of stack to fill stimulus in um
+        delx = (rf.shape[0] * dx - scan_size) / 2
+
+        ny_pad = int(dely / dy_morph)  # number of pixels needed to fill the gap
+        nx_pad = int(delx / dx_morph)
+
+        morph_pad = np.lib.pad(morph, ((nx_pad, nx_pad), (ny_pad, ny_pad)), 'constant', constant_values=0)
+
+        factor = (morph_pad.shape[0] / rf.shape[0], morph_pad.shape[1] / rf.shape[1])
+
+        rf_pad = scimage.zoom(rf, factor, order=0)
+
+        params_rf = scimage.extrema(rf_pad)
+        (off, on, off_ix, on_ix) = params_rf
+
+        if abs(off) > abs(on):
+            idx_rfcenter = off_ix
+        else:
+            idx_rfcenter = on_ix
+
+        (idx_soma, idy_soma) = scimage.center_of_mass(morph_pad)
+
+        shift_x = int(idx_rfcenter[0] + factor[0] / 2 - int(idx_soma))
+        shift_y = int(idx_rfcenter[1] + factor[1] / 2 - int(idy_soma))
+
+        try:
+            morph_shift = np.lib.pad(morph, (
+                (nx_pad + int(shift_x), nx_pad - int(shift_x)), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
+                                     'constant',
+                                     constant_values=0)
+        except Exception as e1:
+            print(e1)
+            print('RF borders reached')
+
+            if abs(shift_x) > nx_pad:
+
+                if abs(shift_y) < ny_pad:
+
+                    if shift_x > nx_pad:
+
+                        morph_shift = np.lib.pad(morph, (
+                            (int(2 * nx_pad), 0), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
+                                                 'constant',
+                                                 constant_values=0)
+                    else:
+                        morph_shift = np.lib.pad(morph, (
+                            (0, int(2 * nx_pad)), (ny_pad + int(shift_y), ny_pad - int(shift_y))),
+                                                 'constant',
+                                                 constant_values=0)
+                elif abs(shift_y) > ny_pad:
+
+                    if (shift_x > nx_pad) & (shift_y > ny_pad):
+
+                        morph_shift = np.lib.pad(morph, (
+                            (int(2*nx_pad),0), (int(2 * ny_pad), 0)),
+                                                 'constant',
+                                                 constant_values=0)
+                    elif (shift_x < nx_pad) & (shift_y > ny_pad):
+                        morph_shift = np.lib.pad(morph, (
+                            (0,int(2*nx_pad)), (int(2 * ny_pad),0)),
+                                                 'constant',
+                                                 constant_values=0)
+                    elif (shift_x > nx_pad) & (shift_y < ny_pad):
+                        morph_shift = np.lib.pad(morph, (
+                            (int(2 * nx_pad),0), (0,int(2 * ny_pad))),
+                                                 'constant',
+                                                 constant_values=0)
+                    elif (shift_x < nx_pad) & (shift_y < ny_pad):
+                        morph_shift = np.lib.pad(morph, (
+                            (0,int(2 * nx_pad)), (0, int(2 * ny_pad))),
+                                                 'constant',
+                                                 constant_values=0)
+
+
+            elif abs(shift_y) > ny_pad:
+
+                    if shift_y > ny_pad:
+
+                        morph_shift = np.lib.pad(morph, (
+                            (nx_pad + int(shift_x), nx_pad - int(shift_x)), (int(2 * ny_pad), 0)),
+                                                 'constant',
+                                                 constant_values=0)
+                    else:
+                        morph_shift = np.lib.pad(morph, (
+                            (nx_pad + int(shift_x), nx_pad - int(shift_x)), (0, int(2 * ny_pad))),
+                                                 'constant',
+                                                 constant_values=0)
+        self.insert1(dict(key,
+                          morph_pad = morph_pad,
+                          morph_shift = morph_shift,
+                          rf_pad = rf_pad,
+                          idx_center = np.array([idx_rfcenter]),
+                          idx_soma = np.array([int(idx_soma),int(idy_soma)]),
+                          shift_x = int(shift_x),
+                          shift_y = int(shift_y)
+                          ))
+
+
+    def gaussian(self,height, mu_x, mu_y, sd_x, sd_y):
+            """Returns a gaussian function with the given parameters"""
+            sd_x = float(sd_x)
+            sd_y = float(sd_y)
+            return lambda x, y: height * np.exp(-((x - mu_x) ** 2 / (sd_x ** 2) + (y - mu_y) ** 2 / (sd_y ** 2)) / 2)
+
+    def moments(self,data):
+        """Returns (height,mu_x, mu_y, sd_x, sd_y)
+        the gaussian parameters of a 2D distribution by calculating its
+        moments """
+        total = data.sum()
+        X, Y = np.indices(data.shape)
+        mu_x = (X * data).sum() / total
+        mu_y = (Y * data).sum() / total
+        col = data[:, int(mu_y)]
+        sd_x = np.sqrt(np.abs((np.arange(col.size) - mu_y) ** 2 * col / col.sum()).sum())
+        row = data[int(mu_x), :]
+        sd_y = np.sqrt(np.abs((np.arange(row.size) - mu_x) ** 2 * row / row.sum()).sum())
+        height = data.max()
+        return height, mu_x, mu_y, sd_x, sd_y
+
+    def fitgaussian(self,data):
+        """Returns (mu_x, mu_y, sd_x, sd_y)
+        the gaussian parameters of a 2D distribution found by a fit"""
+        params = self.moments(data)
+        errorfunction = lambda p: np.ravel(self.gaussian(*p)(*np.indices(data.shape)) -
+                                           data)
+        p, success = scoptimize.leastsq(errorfunction, params)
+        return p
+
+    def plt_overlay(self):
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (12, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .3
+                 }
+            )
+
+            morph_pad = (self & key).fetch1['morph_pad']
+            morph_shift = (self & key).fetch1['morph_shift']
+            rf_pad = (self & key).fetch1['rf_pad']
+            (shift_x, shift_y) = (self & key).fetch1['shift_x', 'shift_y']
+            (dx_morph, dy_morph) = (Morph() & key).fetch1['dx', 'dy']
+
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+            cell_id = (Cell() & key).fetch1['cell_id']
+
+            line_pad = np.ma.masked_where(morph_pad == 0, morph_pad)
+            line_shift = np.ma.masked_where(morph_shift == 0, morph_shift)
+
+            clim = (0,.1)
+
+            fig, ax = plt.subplots(1, 2)
+            ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
+            ax[0].imshow(line_pad, cmap=plt.cm.gray, clim=clim)
+
+            ax[0].set_xticklabels([])
+            ax[0].set_yticklabels([])
+            ax[0].set_title('original')
+
+            ax[1].imshow(rf_pad, cmap=plt.cm.coolwarm)
+            ax[1].imshow(line_shift, cmap=plt.cm.gray, clim=clim)
+
+            dx_mu = shift_x * dx_morph
+            dy_mu = shift_y * dy_morph
+
+            ax[1].set_xticklabels([])
+            ax[1].set_yticklabels([])
+            ax[1].set_title('shifted by (%.1f , %.1f) $\mu m$' % (dx_mu, dy_mu),)
+
+            plt.suptitle('Overlay rf and morph\n' + str(exp_date) + ': ' + eye + ': ' + str(cell_id),fontsize=16)
+
+            plt.tight_layout()
+            plt.subplots_adjust(top=.8)
+
+            return fig
+
+
+    def plt_center(self):
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (12, 8),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': .2,
+                 'figure.subplot.wspace': .3
+                 }
+            )
+
+            rf_pad = (self & key).fetch1['rf_pad']
+            morph_pad = (self & key).fetch1['morph_pad']
+            idx_rfcenter = (self & key).fetch1['idx_center']
+            idx_soma = (self & key).fetch1['idx_soma']
+            stimDim = (Stim() & key).fetch1['ns_x','ns_y']
+
+            factor = (morph_pad.shape[0]/stimDim[0],morph_pad.shape[1]/stimDim[1])
+
+            fig, ax = plt.subplots(1, 2)
+
+            ax[0].imshow(rf_pad, cmap=plt.cm.coolwarm)
+            ax[0].scatter(idx_rfcenter[0][1] + int(factor[1] / 2), idx_rfcenter[0][0] + int(factor[0] / 2), marker='x', s=100,
+                          linewidth=3, color='k', label='max|w|')
+
+            ax[0].set_xticklabels([])
+            ax[0].set_yticklabels([])
+            ax[0].set_title('Receptive Field')
+            ax[0].legend()
+
+            ax[1].imshow(morph_pad, clim=(0, .01))
+            ax[1].scatter(idx_soma[1], idx_soma[0], marker='x', s=100, linewidth=3, color='b', label='com')
+
+            ax[1].set_xticklabels([])
+            ax[1].set_yticklabels([])
+            ax[1].set_title('Dendritic Field')
+            ax[1].legend()
+
+            return fig
 
 @schema
 class StcInst(dj.Computed):
