@@ -5294,6 +5294,68 @@ class LnpExp(dj.Computed):
 
         return ll, dll
 
+    def plt_sta(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
+            sta_inst = (StaInst() & key).fetch1['sta_inst']
+
+            # Normalize
+            w_sta = sta_inst / abs(sta_inst).max()
+
+            w_lnp, b = (self & key).fetch1['rf', 'b']
+
+            # Normliaze
+            w_lnp = w_lnp/ abs(w_lnp).max()
+
+            fig, ax = plt.subplots(1, 2)
+
+            im0 = ax[0].imshow(w_sta.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest', clim=(-1, 1))
+            cbar = plt.colorbar(im0, ax=ax[0], shrink=.8)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            ax[0].set_title('$w_{MLE}^{LG}$', y=1.02, fontsize=20)
+            ax[0].set_xticklabels([])
+            ax[0].set_yticklabels([])
+
+            im1 = ax[1].imshow(w_lnp.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest', clim=(-1, 1))
+            cbar = plt.colorbar(im1, ax=ax[1], shrink=.8)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            ax[1].set_title('$w_{MLE}^{LNP},\; bias = $%.1f' % (b), y=1.02, fontsize=20)
+            ax[1].set_xticklabels([])
+            ax[1].set_yticklabels([])
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.85)
+
+            plt.suptitle('MLE Filter Estimate for the LNP model\n' + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
+
+
 
 
 
