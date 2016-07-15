@@ -2060,6 +2060,186 @@ class Overlay(dj.Computed):
 
             return fig
 
+
+@schema
+class Blur(dj.Computed):
+
+    definition="""
+    -> Overlay
+    ---
+    min_res         : double    # minimum total residual sum, per pixel
+    sig_minres      : double    # blurring filter size with which min residual was observed
+    max_r           : double    # maximum correlation with rf
+    sig_maxr        : double    # blurring filter size with which max correlation was observed
+    rf_z            : longblob  # normalized rf
+    df_z_minres     : longblob  # normalized, blurred df
+    df_z_maxr       : longblob  # normalized, blurred df
+    """
+
+
+    def _make_tuples(self,key):
+
+        morph_pad = (Overlay() & key).fetch1['morph_shift'] # shifted and w/o soma
+        ns_x,ns_y = (Stim() & key).fetch1['ns_x','ns_y']
+
+        rf = (StaInst() & key).fetch1['rf'].reshape(ns_x,ns_y)
+
+        # Normalize RF
+
+        b = np.mean(rf[0, :])
+        peak = abs(rf).max()
+        rf_z = (rf - b) / peak
+
+        # Blur
+        sig = np.arange(0, 100, 10)
+        blur = {}
+        blur.clear()
+        blur['blur'] = []
+        blur['sigma'] = []
+
+        for s in sig:
+            blur['blur'].append(scimage.gaussian_filter(morph_pad, sigma=s))  # blur
+            blur['sigma'].append(s)
+
+        blur_df = pd.DataFrame(blur)
+
+        df_nz = []
+        for ix, row in blur_df.iterrows():
+            df_nz.append(scmisc.imresize(row.blur, rf.shape, interp='bicubic'))  # down-sample
+
+        blur_df = blur_df.assign(df_nz=df_nz)
+
+        df_z = []
+        res = []
+        res_n = []
+        res_sum = []
+        r = []
+
+        for ix, row in blur_df.iterrows():
+            if abs(rf_z.min()) > abs(rf_z.max()):
+                df_z.append(-(row.df_nz / abs(row.df_nz).max()))
+            else:
+                df_z.append((row.df_nz / abs(row.df_nz).max()))
+            res.append(df_z[ix] - rf_z)
+            res_n.append(res[ix] / abs(res[ix]).max())
+            res_sum.append(abs(res[ix]).sum() / len(rf.flatten()))
+            r.append(np.corrcoef(df_z[ix].flatten(), rf_z.flatten())[0, 1])
+
+        blur_df = blur_df.assign(df=df_z)
+        blur_df = blur_df.assign(res=res)
+        blur_df = blur_df.assign(res_n=res_n)
+        blur_df = blur_df.assign(res_sum=res_sum)
+        blur_df = blur_df.assign(r=r)
+
+        ix_min_res = blur_df.res_sum.idxmin()
+        ix_max_r = blur_df.r.idxmax()
+
+        self.insert1(dict(key,
+                          min_res = blur_df.res_sum.min(),
+                          sig_minres = blur_df.sigma[ix_min_res],
+                          sig_maxr = blur_df.sigma[ix_max_r],
+                          max_r = blur_df.r.max(),
+                          rf_z = rf_z,
+                          df_z_minres = blur_df.df[ix_min_res],
+                          df_z_maxr = blur_df.df[ix_max_r]
+                          ))
+
+    def plt_minres(self):
+
+        for key in self.project().fetch.as_dict:
+
+            plt.rcParams.update(
+                {'figure.figsize': (20, 10),
+                 'axes.titlesize': 16,
+                 'axes.labelsize': 16,
+                 'xtick.labelsize': 16,
+                 'ytick.labelsize': 16,
+                 'figure.subplot.hspace': 0.1,
+                 'figure.subplot.wspace': 0.2
+                 }
+            )
+
+            df_minres = (self & key).fetch1['df_z_minres']
+            df_maxr = (self & key).fetch1['df_z_maxr']
+            rf_z = (self & key).fetch1['rf_z']
+            minres = (self & key).fetch1['min_res']
+            maxr = (self & key).fetch1['max_r']
+            sig_minres = (self & key).fetch1['sig_minres']
+            sig_maxr = (self & key).fetch1['sig_maxr']
+
+            rf_pad = (Overlay() & key).fetch1['rf_pad']
+            stack_pad = (Overlay() & key).fetch1['morph_shift']
+
+            blur = scimage.gaussian_filter(stack_pad, sigma=.7)
+            line_bl = np.ma.masked_where(blur == 0, blur)
+
+
+            fig = plt.figure()
+            gs1 = gridsp.GridSpec(2, 1)
+            gs1.update(right=.48)
+            ax = plt.subplot(gs1[:, :])
+            im = ax.imshow((rf_pad - rf_pad[0, :].mean()) / abs(rf_pad).max(), cmap=plt.cm.coolwarm,
+                           interpolation='nearest')
+            li = ax.imshow(line_bl, cmap=plt.cm.Greys_r)
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+            cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.9)
+            cbar.set_label('normed rf', labelpad=40, rotation=270)
+            tick_locator = ticker.MaxNLocator(nbins=5)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            gs2 = gridsp.GridSpec(2, 2)
+            gs2.update(left=.55, right=.98)
+            ax = plt.subplot(gs2[0, 0])
+            im = ax.imshow(df_minres, cmap=plt.cm.coolwarm, interpolation='nearest')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title('$\sigma$ : %.1f' % (sig_minres))
+            cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.95)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            ax = plt.subplot(gs2[0, 1])
+            im = ax.imshow(df_minres - rf_z, cmap=plt.cm.coolwarm, clim=(-1, 1), interpolation='nearest')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title('$\Sigma|rf-df_\sigma|_{min}$ : %.2f' % (minres))
+            cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.95)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            ax = plt.subplot(gs2[1, 0])
+            im = ax.imshow(df_maxr, cmap=plt.cm.coolwarm, interpolation='nearest')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title('$\sigma$ : %.1f' % (sig_maxr))
+            cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.95)
+            cbar.set_label('blurred df', labelpad=20, rotation=270, y=1.1)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            ax = plt.subplot(gs2[1, 1])
+            im = ax.imshow(df_maxr - rf_z, cmap=plt.cm.coolwarm, clim=(-1, 1), interpolation='nearest')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title('$corr_{max}$ : %.2f' % (maxr))
+            cbar = plt.colorbar(im, ax=ax, format='%.1f', shrink=.95)
+            cbar.set_label('residual', labelpad=30, rotation=270, y=1.1)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            fig.suptitle(str(key['exp_date']) + ': ' +  key['eye'] + ':' + str(key['cell_id']) + ': ' + key['filename'], fontsize=18)
+            fig.subplots_adjust(top=.88)
+
+
+            return fig
+
+
 @schema
 class StcInst(dj.Computed):
     definition="""
