@@ -2363,7 +2363,7 @@ class NonlinInstBlur(dj.Computed):
             fig, ax = plt.subplots()
 
             ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12)
-            ax.set_xlabel('projection onto STA axis')
+            ax.set_xlabel('projection onto filter axis')
             ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
             plt.locator_params(nbins=4)
 
@@ -2376,7 +2376,89 @@ class NonlinInstBlur(dj.Computed):
 
             return fig
 
+@schema
+class NonlinInstExpBlur(dj.Computed):
+    definition = """
+    -> NonlinInst
+    ---
+    aopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    bopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    copt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
+    res     :double     # absolute residuals
 
+    """
+
+    def _make_tuples(self, key):
+
+        nspikes = (Spikes() & key).fetch1['nspikes']
+        s1d,rate = (NonlinInstBlur() & key).fetch1['s1d_sta','rate']
+        p_ys = np.nan_to_num(rate)
+
+        try:
+            popt, pcov = scoptimize.curve_fit(self.non_lin_exp, s1d[p_ys != 0], p_ys[p_ys != 0])
+
+        except Exception as e1:
+            print('Exponential fit failed due to:\n', e1)
+            popt=(0,0,0)
+
+        aopt, bopt, copt = popt
+
+        res = abs(self.non_lin_exp(s1d[p_ys != 0], aopt, bopt, copt) - p_ys[p_ys != 0]).sum()/nspikes
+
+        self.insert1(dict(key,
+                          aopt=aopt,
+                          bopt=bopt,
+                          copt=copt,
+                          res = res))
+
+
+    def non_lin_exp(self,x,a,b,c):
+        return a * np.exp(b * x) + c
+
+    def plt_rate(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (12, 6),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            s1d,rate = (NonlinInstBlur() & key).fetch1['s1d_sta','rate']
+            aopt,bopt,copt,res = (self & key).fetch1['aopt','bopt','copt','res']
+
+
+            p_ys = np.nan_to_num(rate)
+            f = self.non_lin_exp(s1d,aopt,bopt,copt)
+
+            fig, ax = plt.subplots()
+
+            ax.plot(s1d[p_ys != 0], p_ys[p_ys != 0], 'o', markersize=12,label='histogramm ratio')
+            ax.plot(s1d, f,label='fit',color=curpal[2],linewidth=2)
+            ax.set_xlabel('projection onto filter axis')
+            ax.set_ylabel('rate $\\frac{s|y}{s}$', labelpad=20)
+            plt.locator_params(nbins=4)
+            ax.legend()
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.88)
+
+            plt.suptitle('Instantaneous Non-Linearity Estimate: $\\Sigma_{res}$ %.1e\n'%(res) + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
 
 @schema
 class StcInst(dj.Computed):
