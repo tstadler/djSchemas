@@ -2082,7 +2082,7 @@ class Blur(dj.Computed):
         morph_pad = (Overlay() & key).fetch1['morph_shift'] # shifted and w/o soma
         ns_x,ns_y = (Stim() & key).fetch1['ns_x','ns_y']
 
-        rf = (StaInst() & key).fetch1['rf'].reshape(ns_x,ns_y)
+        rf = (StaInst() & key).fetch1['sta_inst'].reshape(ns_x,ns_y)
 
         # Normalize RF
 
