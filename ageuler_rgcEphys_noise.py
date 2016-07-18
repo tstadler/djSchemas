@@ -2451,8 +2451,10 @@ class Blur(dj.Computed):
     definition="""
     -> Overlay
     ---
+    res             : longblob  # residuals for different sigmas
     min_res         : double    # minimum total residual sum, per pixel
     sig_minres      : double    # blurring filter size with which min residual was observed
+    r               : longblob  # correlations for different sigmas
     max_r           : double    # maximum correlation with rf
     sig_maxr        : double    # blurring filter size with which max correlation was observed
     rf_z            : longblob  # normalized rf
@@ -2517,10 +2519,13 @@ class Blur(dj.Computed):
 
         ix_min_res = blur_df.res_sum.idxmin()
         ix_max_r = blur_df.r.idxmax()
+        display(blur_df)
 
         self.insert1(dict(key,
+                          res = np.array(res_sum),
                           min_res = blur_df.res_sum.min(),
                           sig_minres = blur_df.sigma[ix_min_res],
+                          r = np.array(r),
                           sig_maxr = blur_df.sigma[ix_max_r],
                           max_r = blur_df.r.max(),
                           rf_z = rf_z,
