@@ -5376,7 +5376,7 @@ class PredLnpExp(dj.Computed):
 
         kf = KFold(ntrigger, n_folds=k_fold, shuffle=False)
 
-        pars0 = np.hstack((w_sta, 0))
+        pars0 = w_sta #np.hstack((w_sta, 0))
 
         ## Cross-validate
         LNP_dict = {}
@@ -5384,7 +5384,7 @@ class PredLnpExp(dj.Computed):
         LNP_dict['nll_train'] = []
         LNP_dict['nll_test'] = []
         LNP_dict['w'] = []
-        LNP_dict['b'] = []
+        #LNP_dict['b'] = []
         LNP_dict['res'] = []
         LNP_dict['pearson_r'] = []
         LNP_dict['r'] = []
@@ -5398,17 +5398,17 @@ class PredLnpExp(dj.Computed):
 
             nll_train = res.fun
             params_opt = res.x
-            w_opt = res.x[0:ns]
-            b_opt = res.x[ns]
+            w_opt = res.x#[0:ns]
+            #b_opt = res.x[ns]
 
             LNP_dict['nll_train'].append(nll_train)
             LNP_dict['nll_test'].append(self.ll_exp(params_opt, s[:, test], y[test])[0])
             LNP_dict['w'].append(w_opt)
-            LNP_dict['b'].append(b_opt)
+            #LNP_dict['b'].append(b_opt)
 
             ## Predict spike rates
 
-            r = np.exp(np.dot(w_opt,s[:, test]) + b_opt)
+            r = np.exp(np.dot(w_opt,s[:, test])) #+ b_opt)
 
             err = np.square(y[test] / ntrigger - r).sum() / len((test))
             LNP_dict['res'].append(err)
@@ -5447,18 +5447,18 @@ class PredLnpExp(dj.Computed):
         """
         ns, T = s.shape
 
-        wT = params[0:ns]
-        b = params[ns]
+        wT = params#[0:ns]
+        #b = params[ns]
 
-        r = np.exp(np.dot(wT, s) + b)
-        ll = sign * (np.dot(np.dot(wT, s) + b, y) - np.dot(r, np.ones(T)))
+        r = np.exp(np.dot(wT, s))# + b)
+        ll = sign * (np.dot(np.dot(wT, s), y) - np.dot(r, np.ones(T)))
 
         dll_w = sign * (np.dot(s, y) - np.dot(s, r))
-        dll_b = sign * (np.dot((y - r), np.ones(T)))
+        #dll_b = sign * (np.dot((y - r), np.ones(T)))
 
-        dll = np.hstack((dll_w, dll_b))
+        #dll = np.hstack((dll_w, dll_b))
 
-        return ll, dll
+        return ll, dll_w
 
     def plt_pred(self, ):
 
