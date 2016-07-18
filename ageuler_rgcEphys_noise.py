@@ -1765,10 +1765,6 @@ class StaInst(dj.Computed):
 
     """
 
-    @property
-    def populated_from(self):
-        return Recording() & dict(stim_type='bw_noise')
-
     def _make_tuples(self,key):
 
         fs = (Recording() & key).fetch1['fs']
@@ -1817,9 +1813,6 @@ class NonlinInst(dj.Computed):
     rate    :longblob   # ratio between histograms along 1d stimulus axis
     """
 
-    @property
-    def populated_from(self):
-        return Recording() & dict(stim_type='bw_noise')
 
     def _make_tuples(self, key):
 
@@ -4466,7 +4459,7 @@ class PredStaInst(dj.Computed):
     r       :longblob                           # predicted rate
     k       :double                             # split for cross-validation
     rho     :double                             # mean correlation coefficient
-    res     :double                             # mean ordinaray test error
+    res     :double                             # mean ordinary test error
     nl_type :enum('exp','sm','thr','none')      # type of rectifying non-linearity used, selected as best fitting from those three
     """
 
@@ -4656,7 +4649,7 @@ class PredStaInstBlur(dj.Computed):
     ---
     r       :longblob                           # predicted rate
     rho     :double                             # mean correlation coefficient
-    res     :double                             # mean ordinaray test error
+    res     :double                             # mean ordinary test error
     nl_type :enum('exp','sm','thr','none')      # type of rectifying non-linearity used, selected as best fitting from those three
     """
 
@@ -5402,8 +5395,9 @@ class PredLnpExp(dj.Computed):
 
             res = scoptimize.minimize(self.ll_exp, pars0, args=(s[:, train], y[train]), jac=True)
 
-            params_opt = res.x
+
             nll_train = res.fun
+            params_opt = res.x
             w_opt = res.x[0:ns]
             b_opt = res.x[ns]
 
