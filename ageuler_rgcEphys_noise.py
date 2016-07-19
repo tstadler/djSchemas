@@ -5235,7 +5235,6 @@ class LnpExp(dj.Computed):
     -> StimInst
     ---
     rf  :longblob   # mle of the rf under an LNP with exponential non-linearity
-    b   :double     # non-linear bias term
     nll : double    # negative log-likelihood achieved
     """
 
@@ -5249,17 +5248,15 @@ class LnpExp(dj.Computed):
 
         ns,T = s.shape
 
-        pars0 = np.hstack((w_sta, 0))
+        pars0 = w_sta
 
         res = scoptimize.minimize(self.ll_exp, pars0, args=(s, y, -1), jac=True)
 
         nll = res.fun
-        w_opt = res.x[0:ns]
-        b_opt = res.x[ns]
+        w_opt = res.x
 
         self.insert1(dict(key,
                           rf = w_opt,
-                          b = b_opt,
                           nll = nll))
 
     def ll_exp(self,params, s, y, sign=-1):
@@ -5276,18 +5273,14 @@ class LnpExp(dj.Computed):
         """
         ns, T = s.shape
 
-        wT = params[0:ns]
-        b = params[ns]
+        wT = params
 
-        r = np.exp(np.dot(wT, s) + b)
-        ll = sign * (np.dot(np.dot(wT, s) + b, y) - np.dot(r, np.ones(T)))
+        r = np.exp(np.dot(wT, s))
+        ll = sign * (np.dot(y,np.log(r)) - np.dot(r,np.ones(T)))
 
         dll_w = sign * (np.dot(s, y) - np.dot(s, r))
-        dll_b = sign * (np.dot((y - r), np.ones(T)))
 
-        dll = np.hstack((dll_w, dll_b))
-
-        return ll, dll
+        return ll, dll_w
 
     def plt_sta(self):
 
@@ -5314,7 +5307,7 @@ class LnpExp(dj.Computed):
             # Normalize
             w_sta = sta_inst / abs(sta_inst).max()
 
-            w_lnp, b = (self & key).fetch1['rf', 'b']
+            w_lnp,nll = (self & key).fetch1['rf','nll']
 
             # Normliaze
             w_lnp = w_lnp/ abs(w_lnp).max()
@@ -5337,7 +5330,7 @@ class LnpExp(dj.Computed):
             cbar.locator = tick_locator
             cbar.update_ticks()
 
-            ax[1].set_title('$w_{MLE}^{LNP},\; bias = $%.1f' % (b), y=1.02, fontsize=20)
+            ax[1].set_title('$w_{MLE}^{LNP}$', y=1.02, fontsize=20)
             ax[1].set_xticklabels([])
             ax[1].set_yticklabels([])
 
@@ -5381,7 +5374,7 @@ class PredLnpExp(dj.Computed):
 
         kf = KFold(ntrigger, n_folds=k_fold, shuffle=False)
 
-        pars0 = w_sta #np.hstack((w_sta, 0))
+        pars0 = w_sta
 
         ## Cross-validate
         LNP_dict = {}
@@ -5389,7 +5382,6 @@ class PredLnpExp(dj.Computed):
         LNP_dict['nll_train'] = []
         LNP_dict['nll_test'] = []
         LNP_dict['w'] = []
-        #LNP_dict['b'] = []
         LNP_dict['res'] = []
         LNP_dict['pearson_r'] = []
         LNP_dict['r'] = []
@@ -5403,17 +5395,15 @@ class PredLnpExp(dj.Computed):
 
             nll_train = res.fun
             params_opt = res.x
-            w_opt = res.x#[0:ns]
-            #b_opt = res.x[ns]
+            w_opt = res.x
 
             LNP_dict['nll_train'].append(nll_train)
             LNP_dict['nll_test'].append(self.ll_exp(params_opt, s[:, test], y[test])[0])
             LNP_dict['w'].append(w_opt)
-            #LNP_dict['b'].append(b_opt)
 
             ## Predict spike rates
 
-            r = np.exp(np.dot(w_opt,s[:, test])) #+ b_opt)
+            r = np.exp(np.dot(w_opt,s[:, test]))
 
             err = np.square(y[test] / ntrigger - r).sum() / len((test))
             LNP_dict['res'].append(err)
@@ -5437,8 +5427,7 @@ class PredLnpExp(dj.Computed):
                           nll = np.nanmean(LNP_df.nll_test,0)
                           ))
 
-    def ll_exp(self,params, s, y, sign=-1):
-
+    def ll_exp(self, params, s, y, sign=-1):
         """
             Compute the log-likelihood of an LNP model wih exponential non-linearity
             :arg params:
@@ -5452,16 +5441,12 @@ class PredLnpExp(dj.Computed):
         """
         ns, T = s.shape
 
-        wT = params#[0:ns]
-        #b = params[ns]
+        wT = params
 
-        r = np.exp(np.dot(wT, s))# + b)
-        ll = sign * (np.dot(np.dot(wT, s), y) - np.dot(r, np.ones(T)))
+        r = np.exp(np.dot(wT, s))
+        ll = sign * (np.dot(y, np.log(r)) - np.dot(r, np.ones(T)))
 
         dll_w = sign * (np.dot(s, y) - np.dot(s, r))
-        #dll_b = sign * (np.dot((y - r), np.ones(T)))
-
-        #dll = np.hstack((dll_w, dll_b))
 
         return ll, dll_w
 
