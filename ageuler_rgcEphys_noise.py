@@ -67,7 +67,7 @@ class Cell(dj.Manual):
 @schema
 class Morph(dj.Computed):
     definition="""
-    # Reconstructed morphology of the cell as a line-stack
+    # Reconstructed morphology of the cell as a 3-dimensional line-stack
     -> Cell
     ---
     stack       :longblob       # array (scan_z x scan_x x scan_y)
@@ -192,9 +192,10 @@ class Morph(dj.Computed):
 class Cut(dj.Computed):
 
     definition="""
-    # Cut soma from Morphology to get DF
 
-    ->Morph
+    # Cut soma from Morphology to get dendrites only
+
+    -> Morph
     ---
     stack_wos   :longblob
     dens1       :longblob
@@ -430,9 +431,11 @@ class Cut(dj.Computed):
 @schema
 class Recording(dj.Manual):
     definition = """
+
     # Information for a particular recording file
 
     -> Cell
+
     filename		: varchar(200) 		  						# name of the converted recording file
     ---
     rec_type                            : enum('intracell','extracell')                     # recording is an intra- or juxtacellular recordin
@@ -447,7 +450,8 @@ class Recording(dj.Manual):
 @schema
 class Spikes(dj.Computed):
     definition = """
-    # Spike times in the Recording
+
+    # Spike detection from raw voltage traces as threshold crossings
 
     -> Recording
     ---
@@ -804,7 +808,8 @@ class Spikes(dj.Computed):
 @schema
 class Trigger(dj.Computed):
     definition = """
-    ->Recording
+    # Detect light trigger
+    -> Recording
     ---
     triggertimes	:longblob	# trigger times in sample points
     ntrigger        :int        # n of triggers = n of stimulus frames displayed
@@ -971,6 +976,7 @@ class Trigger(dj.Computed):
 @schema
 class StimMeta(dj.Computed):
     definition="""
+
     # Fetch parameter set and stimulus array from filename
 
     -> Recording
@@ -1073,8 +1079,8 @@ class StimMeta(dj.Computed):
 class Stim(dj.Computed):
     definition="""
     # Stimulus frames for a given mseq
-    ->Recording
-    ->StimMeta
+    -> Recording
+    -> StimMeta
     ---
     sc   	: longblob		# centered stimulus as a (ns x t) array, where ns = ns_x x ns_y
     t	    : int			# number of frames
@@ -1128,7 +1134,9 @@ class Stim(dj.Computed):
 @schema
 class Sta(dj.Computed):
     definition = """
+
         # Calculate the spike-triggered ensemble from noise recording
+
         -> Stim
         -> Spikes
         -> Trigger
@@ -1524,6 +1532,8 @@ class Sta(dj.Computed):
 @schema
 class Stc(dj.Computed):
     definition="""
+    # Calculate the spike-triggered covariance
+
     -> Stim
     -> Sta
     ---
@@ -1729,6 +1739,8 @@ class Stc(dj.Computed):
 @schema
 class StimInst(dj.Computed):
     definition="""
+    # Convolve stimulus with time kernel for model-based rf inference with instantaneous spatial filter only
+
     -> Stim
     -> Sta
     ---
@@ -1756,6 +1768,8 @@ class StimInst(dj.Computed):
 @schema
 class StaInst(dj.Computed):
     definition="""
+    # Compute the whitened STA based on the instantaneous stimulus ensemble of binary white noise (stimulus ensemble must be uncorrelated!)
+
     -> StimInst
     -> Spikes
     -> Trigger
@@ -1800,17 +1814,19 @@ class StaInst(dj.Computed):
 @schema
 class NonlinInst(dj.Computed):
     definition = """
+    # Approximate the spike-triggered and raw stimulus distributions by a binned histogram
+    along the 1-dimensional stimulus projection axis provied by the inst STA
     -> StimInst
     -> StaInst
     ---
-    s1d_sta :longblob   # binned 1-dimensional stimulus projected onto sta axis
-    rse_mean    :double # mean of the projected raw stimulus ensemble
-    rse_var     :double # variance of the projected raw stimulus ensemble
-    p_rse   :longblob   # density along 1d axis of raw stimulus ensemble
-    ste_mean    :double # mean of the projected spike-triggered stimulus ensemble
-    ste_var     :double # variance of the projected spike-trigger stimulus ensemble
-    p_ste   :longblob   # density along 1d axis of spike-triggered stimulus ensemble
-    rate    :longblob   # ratio between histograms along 1d stimulus axis
+    s1d_sta     :longblob   # binned 1-dimensional stimulus projected onto sta axis
+    rse_mean    :double     # mean of the projected raw stimulus ensemble
+    rse_var     :double     # variance of the projected raw stimulus ensemble
+    p_rse       :longblob   # density along 1d axis of raw stimulus ensemble
+    ste_mean    :double     # mean of the projected spike-triggered stimulus ensemble
+    ste_var     :double     # variance of the projected spike-trigger stimulus ensemble
+    p_ste       :longblob   # density along 1d axis of spike-triggered stimulus ensemble
+    rate        :longblob   # ratio between histograms along 1d stimulus axis
     """
 
 
@@ -1937,6 +1953,8 @@ class NonlinInst(dj.Computed):
 @schema
 class NonlinInstExp(dj.Computed):
     definition = """
+    # Fit a parametric exponential function to the ratio between spike-triggered and raw stimulus ensemble
+
     -> NonlinInst
     ---
     aopt    :double     # parameter fit for instantaneous non-linearity of the form a*np.exp(b*x) + c
@@ -2039,7 +2057,7 @@ class NonlinInstSoftmax(dj.Computed):
             popt, pcov = scoptimize.curve_fit(self.softmax, s1d[p_ys != 0], p_ys[p_ys != 0])
 
         except Exception as e1:
-            print('Exponential fit failed due to:\n', e1)
+            print('Parametric fit failed due to:\n', e1)
             popt=(0,0)
 
         aopt, topt = popt
@@ -5525,30 +5543,130 @@ class PredLnpExp(dj.Computed):
             return fig
 
 
+@schema
+class LnpExpBias(dj.Computed):
+    definition="""
+    -> StimInst
+    ---
+    rf  :longblob   # mle of the rf under an LNP with exponential non-linearity
+    b   :double     # non-linear bias term
+    nll : double    # negative log-likelihood achieved
+    """
 
 
 
+    def _make_tuples(self,key):
+
+        ntrigger = (Trigger() & key).fetch1['ntrigger']
+        s = (StimInst() & key).fetch1['s_inst'][:,0:ntrigger]
+        w_sta,y = (StaInst() & key).fetch1['sta_inst','y']
+
+        ns,T = s.shape
+
+        pars0 = np.hstack((w_sta,0))
+
+        res = scoptimize.minimize(self.ll_exp_bias, pars0, args=(s, y, -1), jac=True)
+        print(res.message,res.nfev)
+        nll = res.fun
+        w_opt = res.x[0:ns]
+        b_opt = res.x[ns]
+
+        self.insert1(dict(key,
+                          rf = w_opt,
+                          b = b_opt,
+                          nll = nll))
+
+    def ll_exp_bias(self,params, s, y, sign=-1):
+        """
+            Compute the log-likelihood of an LNP model wih exponential non-linearity
+            :arg params:
+                :arg wT: current receptive field array(ns,)
+                :arg b: scalar current offset estimate
+            :arg s: stimulus array(ns,T)
+            :arg y: spiketimes array(T,1)
+
+            :return sign*ll: computed log-likelihood scalar
+            :return sign*dll: computed first derivative of the ll
+        """
+        ns, T = s.shape
+
+        wT = params[0:ns]
+        b = params[ns]
+
+        r = np.exp(np.dot(wT, s)) + b
+        ll = sign * (np.dot(y,np.log(r)) - np.dot(r,np.ones(T)))
+
+        dll_w = sign * (y/r*np.exp(np.dot(wT,s))*s - np.exp(np.dot(wT,s))).sum(axis=1)
+        dll_b = sign*(y/r).sum()
+        dll = np.hstack((dll_w,dll_b))
+
+        return ll, dll
+
+    def plt_sta(self):
+
+        plt.rcParams.update(
+            {'figure.figsize': (15, 8),
+             'axes.titlesize': 16,
+             'axes.labelsize': 16,
+             'xtick.labelsize': 16,
+             'ytick.labelsize': 16,
+             'figure.subplot.hspace': .2,
+             'figure.subplot.wspace': .2
+             }
+        )
+        curpal = sns.color_palette()
+
+        for key in self.project().fetch.as_dict:
+            fname = key['filename']
+            exp_date = (Experiment() & key).fetch1['exp_date']
+            eye = (Experiment() & key).fetch1['eye']
+
+            ns_x, ns_y = (Stim() & key).fetch1['ns_x', 'ns_y']
+            sta_inst = (StaInst() & key).fetch1['sta_inst']
+
+            # Normalize
+            w_sta = sta_inst #/ abs(sta_inst).max()
+
+            w_lnp,nll = (self & key).fetch1['rf','nll']
+
+            # Normliaze
+            #w_lnp = w_lnp/ abs(w_lnp).max()
+
+            fig, ax = plt.subplots(1, 2)
+
+            im0 = ax[0].imshow(w_sta.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest')
+            cbar = plt.colorbar(im0, ax=ax[0], shrink=.8)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            ax[0].set_title('$w_{MLE}^{LG}$', y=1.02, fontsize=20)
+            ax[0].set_xticklabels([])
+            ax[0].set_yticklabels([])
+
+            im1 = ax[1].imshow(w_lnp.reshape(ns_x, ns_y), cmap=plt.cm.coolwarm, interpolation='nearest')
+            cbar = plt.colorbar(im1, ax=ax[1], shrink=.8)
+            tick_locator = ticker.MaxNLocator(nbins=4)
+            cbar.locator = tick_locator
+            cbar.update_ticks()
+
+            ax[1].set_title('$w_{MLE}^{LNP}$', y=1.02, fontsize=20)
+            ax[1].set_xticklabels([])
+            ax[1].set_yticklabels([])
+
+            fig.tight_layout()
+            fig.subplots_adjust(top=.85)
+
+            plt.suptitle('MLE Filter Estimate for the LNP model\n' + str(
+                exp_date) + ': ' + eye + ': ' + fname,
+                         fontsize=16)
+
+            return fig
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def addEntry(animal_id,sex,date_of_birth,exp_date,experimenter,eye,cell_id,data_folder,rec_type, ch_voltage, ch_trigger,filename):
+def addEntry(animal_id,sex,date_of_birth,exp_date,experimenter,eye,cell_id,data_folder,
+             rec_type, ch_voltage, ch_trigger,filename):
     """
 
     :param animal_id: str 'ZK0-yyyy-mm-dd'
